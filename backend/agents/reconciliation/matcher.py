@@ -2,7 +2,7 @@
 # This file will contain the matching algorithms and logic
 from decimal import Decimal
 from typing import Optional
-from src.domain.models import BusinessEvent, MatchResult, Discrepancy
+from domain.models import BusinessEvent, MatchResult, Discrepancy
 
 # Load this from the agent's config
 # (Hardcoded here for simplicity in this pure function)

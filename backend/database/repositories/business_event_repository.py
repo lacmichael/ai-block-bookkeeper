@@ -4,7 +4,7 @@ import asyncpg
 import json
 from typing import List, Optional, Dict, Any
 from uuid import UUID
-from src.domain.models import BusinessEvent
+from domain.models import BusinessEvent
 
 #
 # --- QUERY FUNCTIONS ---

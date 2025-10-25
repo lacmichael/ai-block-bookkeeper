@@ -10,9 +10,9 @@ from uagents import Agent, Context, Model
 from pydantic import Field
 from typing import Dict, Any, Optional
 
-from src.domain.models import BusinessEvent, MatchResult
-from src.agents.reconciliation.matcher import evaluate_match
-import src.database.repositories.business_event_repository as db_repo
+from domain.models import BusinessEvent, MatchResult
+from agents.reconciliation.matcher import evaluate_match
+import database.repositories.business_event_repository as db_repo
 
 # --- Global DB Pool & Config ---
 db_pool: Optional[asyncpg.Pool] = None

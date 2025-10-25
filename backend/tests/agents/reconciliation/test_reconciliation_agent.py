@@ -5,10 +5,10 @@ from uuid import uuid4
 from datetime import datetime
 
 # The agent logic function we are testing
-from src.agents.reconciliation_agent import handle_reconciliation_logic
+from agents.reconciliation_agent import handle_reconciliation_logic
 
 # Models for test data
-from src.domain.models import (
+from domain.models import (
     BusinessEvent,
     Processing,
     EventKind
@@ -61,25 +61,25 @@ async def test_case_1_primary_match_flow(mocker, base_invoice, matching_payment)
     """
     # 1. Arrange: Mock all database functions
     mock_get_event = mocker.patch(
-        'src.agents.reconciliation_agent.db_repo.get_business_event_by_id',
+        'agents.reconciliation_agent.db_repo.get_business_event_by_id',
         new_callable=AsyncMock,
         return_value=base_invoice
     )
     mock_find_payment = mocker.patch(
-        'src.agents.reconciliation_agent.db_repo.find_payment_by_reference',
+        'agents.reconciliation_agent.db_repo.find_payment_by_reference',
         new_callable=AsyncMock,
         return_value=matching_payment
     )
     mock_update_reconciled = mocker.patch(
-        'src.agents.reconciliation_agent.db_repo.update_both_to_reconciled',
+        'agents.reconciliation_agent.db_repo.update_both_to_reconciled',
         new_callable=AsyncMock
     )
     mock_flag_review = mocker.patch(
-        'src.agents.reconciliation_agent.db_repo.flag_both_for_review',
+        'agents.reconciliation_agent.db_repo.flag_both_for_review',
         new_callable=AsyncMock
     )
     mock_create_audit = mocker.patch(
-        'src.agents.reconciliation_agent.db_repo.create_audit_log',
+        'agents.reconciliation_agent.db_repo.create_audit_log',
         new_callable=AsyncMock
     )
     
@@ -120,25 +120,25 @@ async def test_case_2_partial_match_flow(mocker, base_invoice, matching_payment)
     
     # Mock all database functions
     mock_get_event = mocker.patch(
-        'src.agents.reconciliation_agent.db_repo.get_business_event_by_id',
+        'agents.reconciliation_agent.db_repo.get_business_event_by_id',
         new_callable=AsyncMock,
         return_value=base_invoice
     )
     mock_find_payment = mocker.patch(
-        'src.agents.reconciliation_agent.db_repo.find_payment_by_reference',
+        'agents.reconciliation_agent.db_repo.find_payment_by_reference',
         new_callable=AsyncMock,
         return_value=matching_payment
     )
     mock_update_reconciled = mocker.patch(
-        'src.agents.reconciliation_agent.db_repo.update_both_to_reconciled',
+        'agents.reconciliation_agent.db_repo.update_both_to_reconciled',
         new_callable=AsyncMock
     )
     mock_flag_review = mocker.patch(
-        'src.agents.reconciliation_agent.db_repo.flag_both_for_review',
+        'agents.reconciliation_agent.db_repo.flag_both_for_review',
         new_callable=AsyncMock
     )
     mock_create_audit = mocker.patch(
-        'src.agents.reconciliation_agent.db_repo.create_audit_log',
+        'agents.reconciliation_agent.db_repo.create_audit_log',
         new_callable=AsyncMock
     )
     
@@ -170,25 +170,25 @@ async def test_case_3_no_match_flow(mocker, base_invoice):
     """
     # 1. Arrange: Program the DB to return *None* for the counterpart
     mock_get_event = mocker.patch(
-        'src.agents.reconciliation_agent.db_repo.get_business_event_by_id',
+        'agents.reconciliation_agent.db_repo.get_business_event_by_id',
         new_callable=AsyncMock,
         return_value=base_invoice
     )
     mock_find_payment = mocker.patch(
-        'src.agents.reconciliation_agent.db_repo.find_payment_by_reference',
+        'agents.reconciliation_agent.db_repo.find_payment_by_reference',
         new_callable=AsyncMock,
         return_value=None  # <--- No counterpart found
     )
     mock_update_reconciled = mocker.patch(
-        'src.agents.reconciliation_agent.db_repo.update_both_to_reconciled',
+        'agents.reconciliation_agent.db_repo.update_both_to_reconciled',
         new_callable=AsyncMock
     )
     mock_flag_review = mocker.patch(
-        'src.agents.reconciliation_agent.db_repo.flag_both_for_review',
+        'agents.reconciliation_agent.db_repo.flag_both_for_review',
         new_callable=AsyncMock
     )
     mock_update_attempt = mocker.patch(
-        'src.agents.reconciliation_agent.db_repo.update_reconciliation_attempt',
+        'agents.reconciliation_agent.db_repo.update_reconciliation_attempt',
         new_callable=AsyncMock
     )
     

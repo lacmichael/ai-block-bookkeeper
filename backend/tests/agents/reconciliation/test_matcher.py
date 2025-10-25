@@ -4,10 +4,10 @@ from uuid import uuid4, UUID
 from datetime import datetime
 
 # Import the function to test
-from src.agents.reconciliation.matcher import evaluate_match
+from agents.reconciliation.matcher import evaluate_match
 
 # Import the domain models we need to create test data
-from src.domain.models import (
+from domain.models import (
     BusinessEvent,
     MatchResult,
     Discrepancy,

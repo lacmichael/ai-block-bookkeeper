@@ -18,7 +18,7 @@ async def get_db_connection():
     finally:
         await conn.close()
 
-from src.database.repositories import business_event_repository as db_repo
+from database.repositories import business_event_repository as db_repo
 
 router = APIRouter()
 
