@@ -1,28 +1,37 @@
 # Core FastAPI dependencies
-fastapi==0.115.6
-uvicorn==0.34.0
+fastapi>=0.100.0,<0.120.0
+uvicorn>=0.30.1,<0.31.0
 python-dotenv==1.0.1
 
 # Data validation and models
-pydantic==2.10.6
+pydantic>=2.8,<2.9
 
-# HTTP client (compatible with Supabase 2.3.0)
-httpx[http2]>=0.24.0,<0.25.0
+# HTTP client (compatible with Supabase 2.3.0 and Anthropic)
+httpx[http2]>=0.26.0,<0.29.0
 
-# Supabase client (using older stable version)
-supabase==1.0.4
+# Supabase client (using newer version compatible with httpx 0.25+)
+supabase
 
 # Structured logging
 structlog==23.2.0
 
 # Agent framework (for reconciliation agent)
-uagents>=0.4.0
+uagents
 
 # Database
 asyncpg>=0.29.0
 
 # Configuration
 pyyaml>=6.0.1
+
+# PDF processing
+pdfplumber>=0.9.0
+
+# AI/LLM integration
+anthropic>=0.18.0
+
+# File handling
+python-magic>=0.4.27
 
 # Testing
 pytest>=7.4.0
