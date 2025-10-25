@@ -1,0 +1,27 @@
+FROM rust:1.80-bullseye AS builder
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    clang \
+    cmake \
+    pkg-config \
+    libssl-dev \
+    llvm-dev \
+    libclang-dev \
+    protobuf-compiler \
+    git \
+    build-essential && rm -rf /var/lib/apt/lists/*
+WORKDIR /opt
+RUN git clone --depth 1 https://github.com/MystenLabs/sui.git
+WORKDIR /opt/sui
+RUN cargo build --release -p sui
+
+FROM debian:bullseye-slim
+RUN apt-get update && apt-get install -y ca-certificates curl bash git && rm -rf /var/lib/apt/lists/*
+COPY --from=builder /opt/sui/target/release/sui /usr/local/bin/sui
+RUN git config --global http.postBuffer 524288000 && \
+    git config --global http.lowSpeedLimit 1000 && \
+    git config --global http.lowSpeedTime 600 && \
+    git config --global fetch.depth 1 && \
+    git config --global clone.depth 1
+EXPOSE 9000
+ENTRYPOINT ["bash","-lc"]
+CMD ["sui start --with-faucet --force-regenesis"]
