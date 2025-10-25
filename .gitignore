@@ -1,79 +1,84 @@
-# Python
-backend/venv/
-backend/__pycache__/
-backend/*.pyc
-backend/*.pyo
-backend/*.pyd
-backend/.Python
-backend/env/
-backend/pip-log.txt
-backend/pip-delete-this-directory.txt
-backend/.pytest_cache/
-backend/.coverage
-backend/htmlcov/
-backend/.tox/
-backend/.nox/
-backend/coverage.xml
-backend/*.cover
-backend/.hypothesis/
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
 
-# Environment variables
-backend/.env
-backend/.env.local
-backend/.env.*.local
-backend/.env.example
-backend/env_template.txt
+# C extensions
+*.so
 
-# Uploads and temporary files
-backend/uploads/
-backend/temp/
-backend/tmp/
-backend/*.log
-backend/logs/
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
-# Node.js
-frontend/node_modules/
-frontend/.next/
-frontend/out/
-frontend/build/
-frontend/dist/
-frontend/.env.local
-frontend/.env.development.local
-frontend/.env.test.local
-frontend/.env.production.local
-frontend/npm-debug.log*
-frontend/yarn-debug.log*
-frontend/yarn-error.log*
-frontend/.pnpm-debug.log*
+# PyInstaller
+*.manifest
+*.spec
 
-# IDE and Editor files
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
 
-# OS generated files
-*.tmp
-*.temp
-*.bak
-*.backup
-*.orig
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
 
-# Database files
-*.db
-*.sqlite
-*.sqlite3
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+.pybuilder/
+target/
 
 # Jupyter Notebook
 .ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
 
 # pyenv
 .python-version
@@ -81,15 +86,31 @@ Thumbs.db
 # pipenv
 Pipfile.lock
 
+# poetry
+poetry.lock
+
+# pdm
+pdm.lock
+.pdm.toml
+
 # PEP 582
 __pypackages__/
 
-# Celery
+# Celery stuff
 celerybeat-schedule
 celerybeat.pid
 
 # SageMath parsed files
 *.sage.py
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
 
 # Spyder project settings
 .spyderproject
@@ -109,10 +130,115 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-# Project specific
-*.pid
-*.seed
-*.pid.lock
+# pytype static type analyzer
+.pytype/
+
+# Cython debug symbols
+cython_debug/
+
+# PyCharm
+.idea/
+
+# VS Code
+.vscode/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+Icon?
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.tmp
+*.temp
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+
+# Project-specific files
+# Configuration files with sensitive data
+config/agent_config.yaml
+config/database.yaml
+config/secrets.yaml
+*.env
+.env.local
+.env.production
+.env.staging
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Log files
+logs/
+*.log
+
+# Temporary files
+tmp/
+temp/
+.tmp/
+
+# Agent runtime files
+agent_data/
+agent_logs/
+agent_cache/
+
+# Test output
+test_output/
+test_results/
+
+# Documentation build
+docs/build/
+docs/_build/
+
+# IDE and editor files
+*.swp
+*.swo
+*~
+.project
+.settings/
+.classpath
+
+# OS generated files
+.DS_Store?
+.Spotlight-V100
+.Trashes
+Icon?
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Archive files (unless specifically needed)
+*.zip
+*.tar.gz
+*.rar
+*.7z
+
+# FastAPI specific
+.fastapi/
+staticfiles/
+
+# Supabase specific
+supabase/
+.supabase/
 
 # Runtime data
 pids
@@ -169,15 +295,3 @@ dist
 # Temporary folders
 tmp/
 temp/
-
-# FastAPI specific
-backend/.fastapi/
-backend/staticfiles/
-
-# Supabase specific
-backend/supabase/
-backend/.supabase/
-
-# Health check and test files (optional - you might want to keep these)
-# backend/health_check.py
-# backend/test_connection.py
