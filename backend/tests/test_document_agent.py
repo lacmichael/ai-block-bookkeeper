@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Test script for the Document Processing Agent.
 This tests the actual agent with message passing.

@@ -93,6 +93,9 @@ poetry.lock
 pdm.lock
 .pdm.toml
 
+# Move (Sui blockchain)
+Move.lock
+
 # PEP 582
 __pypackages__/
 
