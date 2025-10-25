@@ -1,0 +1,13 @@
+# Core FastAPI dependencies
+fastapi==0.115.6
+uvicorn==0.34.0
+python-dotenv==1.0.1
+
+# Data validation and models
+pydantic==2.10.6
+
+# Supabase client
+supabase==2.3.0
+
+# Structured logging
+structlog==23.2.0

@@ -8,7 +8,7 @@ The AI Block Bookkeeper system is powered by 4 core agents that work together to
 
 ### 1. Document Processing Agent
 
-**Purpose:** Converts uploaded invoices/CSVs into clean, standardized transaction data.
+**Purpose:** Converts uploaded invoices and receipts (CSV, PDF) into clean, standardized transaction data.
 
 **Key Function:** Extracts financial data from PDFs and spreadsheets, normalizes formats, and flags unclear data for human review.
 
