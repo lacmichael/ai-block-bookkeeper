@@ -5,8 +5,14 @@ This tests the actual agent with message passing.
 """
 import asyncio
 import os
+import sys
+import json
 from datetime import datetime
+from pathlib import Path
 from dotenv import load_dotenv
+
+# Add parent directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Load environment variables
 load_dotenv()
@@ -21,8 +27,9 @@ async def test_agent():
     print("Document Processing Agent Test")
     print("=" * 50)
     
-    # Path to the example invoice
-    pdf_path = os.path.join(os.path.dirname(__file__), "example", "example_invoice_01.pdf")
+    # Path to the example invoice (go up one directory from tests/)
+    pdf_path = os.path.join(os.path.dirname(__file__), "..", "example", "example_invoice_01.pdf")
+    pdf_path = os.path.abspath(pdf_path)  # Resolve to absolute path
     
     if not os.path.exists(pdf_path):
         print(f"Error: PDF file not found at {pdf_path}")
@@ -60,40 +67,59 @@ async def test_agent():
         print("\nAgent processing completed!")
         print("=" * 50)
         
-        # Display results
-        print(f"Document ID: {response.document_id}")
+        # Display results summary
+        print(f"\nDocument ID: {response.document_id}")
         print(f"Success: {response.success}")
         print(f"Processing Time: {response.processing_time_seconds:.2f} seconds")
         
         if response.success:
-            print("\nExtracted Data:")
+            # Display extracted data as JSON
+            print("\n" + "=" * 50)
+            print("EXTRACTED DATA (Raw AI Output)")
+            print("=" * 50)
             if response.extracted_data:
-                for key, value in response.extracted_data.items():
-                    if key != "error":
-                        print(f"  {key}: {value}")
+                print(json.dumps(response.extracted_data, indent=2, default=str))
+            else:
+                print("No extracted data available")
             
-            print("\nBusiness Event Created:")
+            # Display business event as JSON
+            print("\n" + "=" * 50)
+            print("BUSINESS EVENT (Structured Domain Model)")
+            print("=" * 50)
             if response.business_event:
+                # Quick summary before full JSON
                 event = response.business_event
-                print(f"  Event ID: {event.get('event_id', 'N/A')}")
-                print(f"  Source System: {event.get('source_system', 'N/A')}")
-                print(f"  Event Kind: {event.get('event_kind', 'N/A')}")
-                
-                payee = event.get('payee', {}) or {}
-                if payee:
-                    print(f"  Vendor: {payee.get('party_id', 'N/A')}")
-                
                 amount = event.get('amount_minor', 0)
                 currency = event.get('currency', 'USD')
-                print(f"  Amount: ${amount / 100:.2f} {currency}")
-                print(f"  Description: {event.get('description', 'N/A')}")
+                vendor = event.get('payee', {})
+                payer = event.get('payer', {})
                 
-                processing_state = event.get('processing', {})
-                print(f"  Processing State: {processing_state.get('state', 'N/A')}")
+                print(f"\n Quick Summary:")
+                print(f"  Event ID: {event.get('event_id', 'N/A')}")
+                print(f"  Vendor: {vendor.get('party_id', 'N/A') if vendor else 'N/A'}")
+                print(f"  Payer: {payer.get('party_id', 'N/A') if payer else 'N/A'}")
+                print(f"  Amount: {currency} ${amount / 100:.2f}")
+                print(f"  Processing State: {event.get('processing', {}).get('state', 'N/A')}")
                 
-                print(f"\nDedupe Key: {event.get('dedupe_key', 'N/A')}")
+                # Print full business event
+                print(f"\n Full Business Event JSON:")
+                print(json.dumps(event, indent=2, default=str))
+                
+                # Highlight metadata sections if present
+                metadata = event.get('metadata', {})
+                if metadata:
+                    print(f"\n  Metadata Sections Present:")
+                    for key in metadata.keys():
+                        if key != 'raw_extraction':
+                            value = metadata[key]
+                            if isinstance(value, dict):
+                                print(f"    - {key}: {len(value)} fields")
+                            elif isinstance(value, list):
+                                print(f"    - {key}: {len(value)} items")
+                            else:
+                                print(f"    - {key}")
             else:
-                print("  WARNING: No business event created")
+                print("WARNING: No business event created")
         else:
             print(f"\nError: {response.error_message}")
         
