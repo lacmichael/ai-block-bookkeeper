@@ -10,20 +10,23 @@ The Reconciliation Agent serves as the "logic bridge" between document ingestion
 
 **Primary: Event-Driven (Recommended)**
 
-- FastAPI verification endpoint sends direct message to agent via message queue (RabbitMQ/Redis Pub/Sub)
-- Agent receives `event_id` of newly verified BusinessEvent
+- FastAPI verification endpoint directly sends HTTP POST to Reconciliation Agent's address
+- Uses `uagents.http.http_client` to POST simple JSON message: `{"event_id": "..."}`
+- Agent receives `event_id` of newly verified BusinessEvent via standard `on_message` handler
 - Immediate processing with minimal latency
 - More efficient than polling (no wasted DB queries)
 - Better for real-time reconciliation needs
+- Simpler architecture without separate message broker (RabbitMQ/Redis)
 
 **Fallback: Polling Safety Net**
 
 - `@on_interval(60)` decorator runs every 60 seconds
-- Catches any events missed by message system (network failures, agent downtime)
+- Catches any events missed by HTTP messaging (network failures, agent downtime)
 - Queries for BusinessEvents with `processing.state = 'MAPPED'` that haven't been processed yet
 - Uses a `metadata.reconciliation_attempted_at` timestamp to track processing attempts
+- **Critical**: Uses database row locking (`FOR UPDATE NOWAIT`) to prevent race conditions with event-driven handler
 
-**Rationale**: Event-driven provides speed and efficiency for normal operations, while polling ensures no events fall through the cracks during system issues.
+**Rationale**: Direct HTTP messaging provides speed and efficiency for normal operations, while polling with row locking ensures no events fall through the cracks during system issues.
 
 ## 2. Data Model Extensions
 
@@ -161,9 +164,11 @@ def evaluate_match(event: BusinessEvent, counterpart: BusinessEvent | None) -> M
     if invoice_num != payment_ref:
         return MatchResult(type='NO_MATCH')
 
-    # Check amount match (allowing 1% tolerance for rounding)
+    # Check amount match (allowing 1% or fixed cap, whichever is less)
     amount_diff = abs(invoice_amount - payment_amount)
-    tolerance = invoice_amount * 0.01
+    tolerance_percent = invoice_amount * 0.01
+    tolerance_fixed = 500  # $5.00 in minor units (assuming USD)
+    tolerance = min(tolerance_percent, tolerance_fixed)
 
     if amount_diff <= tolerance:
         return MatchResult(
@@ -188,6 +193,14 @@ def evaluate_match(event: BusinessEvent, counterpart: BusinessEvent | None) -> M
 ```
 
 ## 4. Database Operations (SQL)
+
+### Database Strategy: Supabase (Direct Connection)
+
+The agent will use Supabase as its hosted PostgreSQL database.
+
+- **Connection Method:** We will **NOT** use the `supabase-py` client library. That library is an API wrapper and does not support the advanced, atomic SQL transactions (`BEGIN`, `COMMIT`, `ROLLBACK`) or row-level locking (`FOR UPDATE NOWAIT`) that are required for this agent's resilience.
+- **Library:** We will use the **`asyncpg`** Python library to connect _directly_ to the Supabase PostgreSQL database.
+- **Credentials:** The agent will be configured using the direct **PostgreSQL Connection URI** found in the Supabase project dashboard (under `Project Settings` > `Database` > `Connection string`).
 
 ### SQL Database Schema
 
@@ -266,7 +279,7 @@ async def get_business_event_by_id(event_id: str) -> BusinessEvent | None:
         WHERE event_id = $1
     """
     row = await db.fetchrow(query, event_id)
-    return BusinessEvent.from_db_row(row) if row else None
+    return BusinessEvent.model_validate(row) if row else None
 ```
 
 2. **Find Payment by Reference**
@@ -290,7 +303,7 @@ async def find_payment_by_reference(
         LIMIT 1
     """
     row = await db.fetchrow(query, processing_state, currency, payment_reference)
-    return BusinessEvent.from_db_row(row) if row else None
+    return BusinessEvent.model_validate(row) if row else None
 ```
 
 3. **Find Invoice by Number**
@@ -314,7 +327,7 @@ async def find_invoice_by_number(
         LIMIT 1
     """
     row = await db.fetchrow(query, processing_state, currency, invoice_number)
-    return BusinessEvent.from_db_row(row) if row else None
+    return BusinessEvent.model_validate(row) if row else None
 ```
 
 4. **Get Unreconciled Mapped Events (Polling Fallback)**
@@ -331,9 +344,10 @@ async def get_unreconciled_mapped_events(limit: int = 50) -> List[BusinessEvent]
           AND metadata->>'reconciliation_match_id' IS NULL
         ORDER BY recorded_at ASC
         LIMIT $1
+        FOR UPDATE NOWAIT
     """
     rows = await db.fetch(query, limit)
-    return [BusinessEvent.from_db_row(row) for row in rows]
+    return [BusinessEvent.model_validate(row) for row in rows]
 ```
 
 ### Atomic Update Functions (SQL Transactions)
@@ -466,47 +480,99 @@ async def create_audit_log(
 
 ### Database Connection Setup
 
-**Using asyncpg (recommended for PostgreSQL):**
+The agent will manage the `asyncpg` connection pool using its built-in `on_startup` and `on_shutdown` lifecycle events. The pool is created once and stored in the agent's context for all handlers to use.
+
+**Note:** `src/database/connection.py` (containing the Database class) is no longer needed. The connection pool is now managed directly inside the agent's `on_startup` and `on_shutdown` handlers.
+
+#### Agent Lifecycle & Connection Management
+
+_This code should be added to `src/agents/reconciliation_agent.py`._
 
 ```python
-# src/database/connection.py
+# src/agents/reconciliation_agent.py
 import asyncpg
-from contextlib import asynccontextmanager
+import yaml
+import os
+from uagents import Agent, Context
 
-class Database:
-    def __init__(self, connection_string: str):
-        self.connection_string = connection_string
-        self.pool = None
+# --- Global DB Pool ---
+# Will be initialized in on_startup
+db_pool = None
 
-    async def connect(self):
-        self.pool = await asyncpg.create_pool(
-            self.connection_string,
+# --- Agent Definition ---
+agent = Agent(name="ReconciliationAgent", seed="...")
+
+def load_config():
+    """Loads agent config from YAML and environment."""
+    with open("config/agent_config.yaml", 'r') as f:
+        config = yaml.safe_load(f)
+
+    # CRITICAL: Load the database password from environment variables
+    # DO NOT store it in the YAML file.
+    db_pass = os.environ.get("SUPABASE_DB_PASSWORD")
+    if not db_pass:
+        raise ValueError("SUPABASE_DB_PASSWORD environment variable not set.")
+
+    config['database']['password'] = db_pass
+    return config
+
+@agent.on_event("startup")
+async def startup(ctx: Context):
+    """
+    Runs ONCE when the agent starts.
+    Loads config and initializes the Supabase DB pool.
+    """
+    global db_pool
+
+    config = load_config()
+    ctx.storage.set("config", config)
+
+    ctx.logger.info("Connecting to Supabase (PostgreSQL)...")
+    db_config = config['database']
+
+    # Build the Supabase connection string
+    SUPABASE_CONN_STRING = (
+        f"postgresql://{db_config['user']}:{db_config['password']}"
+        f"@{db_config['host']}:{db_config['port']}/{db_config['name']}"
+    )
+
+    try:
+        db_pool = await asyncpg.create_pool(
+            SUPABASE_CONN_STRING,
             min_size=5,
-            max_size=20,
-            command_timeout=60
+            max_size=20
         )
+        # Store the pool in the agent's context
+        ctx.storage.set("db_pool", db_pool)
+        ctx.logger.info("Database pool connected. Agent is online.")
 
-    async def disconnect(self):
-        if self.pool:
-            await self.pool.close()
+    except Exception as e:
+        ctx.logger.error(f"Failed to connect to Supabase DB: {e}")
+        raise e
 
-    @asynccontextmanager
-    async def transaction(self):
-        async with self.pool.acquire() as conn:
-            async with conn.transaction():
-                yield conn
+@agent.on_event("shutdown")
+async def shutdown(ctx: Context):
+    """Runs when the agent is stopped (Ctrl+C)."""
+    global db_pool
+    if db_pool:
+        ctx.logger.info("Closing database pool...")
+        await db_pool.close()
+        ctx.logger.info("Database pool closed. Agent is offline.")
 
-    async def fetchrow(self, query: str, *args):
-        async with self.pool.acquire() as conn:
-            return await conn.fetchrow(query, *args)
+# --- Agent Handlers ---
+# (on_message and on_interval handlers will now get the pool)
 
-    async def fetch(self, query: str, *args):
-        async with self.pool.acquire() as conn:
-            return await conn.fetch(query, *args)
+@agent.on_message(...)
+async def on_reconciliation_request(ctx: Context, sender: str, msg: ReconciliationRequest):
+    # Get the pool from storage
+    db_pool = ctx.storage.get("db_pool")
 
-    async def execute(self, query: str, *args):
-        async with self.pool.acquire() as conn:
-            return await conn.execute(query, *args)
+    # Acquire a single connection for this task
+    async with db_pool.acquire() as db_conn:
+        # Pass the connection (not the pool) to the logic function
+        # All logic (e.g., db.fetchrow, async with db.transaction())
+        # will now use this 'db_conn'
+        await handle_reconciliation_logic(ctx, db_conn, msg.event_id)
 ```
 
 ### Database Transaction Safety Features
@@ -729,7 +795,6 @@ async def safe_update_to_reconciled(event1_id: str, event2_id: str):
 **API Integration:**
 
 - `src/api/routes/verification.py` - FastAPI endpoint that triggers reconciliation
-- `src/messaging/reconciliation_publisher.py` - Message queue publisher
 
 **Tests:**
 
@@ -738,19 +803,38 @@ async def safe_update_to_reconciled(event1_id: str, event2_id: str):
 
 ## 9. Configuration
 
+The agent's configuration will be managed by a `config/agent_config.yaml` file for non-sensitive values and **environment variables** for secrets.
+
+#### `config/agent_config.yaml`
+
 ```yaml
-# config/reconciliation_agent.yaml
+# config/agent_config.yaml
+# Non-sensitive configuration
+
 reconciliation:
   polling_interval_seconds: 60
-  amount_tolerance_percent: 1.0 # Allow 1% variance for rounding
+  amount_tolerance:
+    percent: 0.01 # 1%
+    fixed_minor: 500 # $5.00 (500 minor units)
   max_retry_attempts: 3
   retry_backoff_seconds: [0, 2, 4]
-  message_queue:
-    type: redis # or rabbitmq
-    host: localhost
-    port: 6379
-    channel: reconciliation_events
+
+database:
+  # Get these values from your Supabase Dashboard
+  # (Settings > Database > Connection parameters)
+  host: "db.[your-project-ref].supabase.co"
+  user: "postgres"
+  port: 5432
+  name: "postgres"
+  # The password MUST be set as an environment variable:
+  # SUPABASE_DB_PASSWORD
 ```
+
+#### Environment Variables
+
+The following environment variable must be set in the agent's runtime environment (e.g., in Docker, a `.env` file):
+
+- **SUPABASE_DB_PASSWORD**: The password for your Supabase postgres user.
 
 ## 10. Monitoring & Observability
 
