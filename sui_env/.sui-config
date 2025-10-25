@@ -1,0 +1,10 @@
+# Sui Local Network Configuration
+# Official GraphQL + General-Purpose Indexer Stack
+# Generated: Sat Oct 25 10:26:40 PDT 2025
+export SUI_PACKAGE_ID=0x886ac175ba7563947a3a393a0f370f53c48f10759a06f4adfecf3380f2eec945
+export AUDIT_TRAIL_OBJ_ID=0x657ec52c22e53f08d6d4bdef2e5bba783d3677741bc77b14f259fa750f7db530
+export SUI_RPC_URL=http://localhost:9000
+export SUI_GRPC_URL=http://localhost:9184
+export SUI_FAUCET_URL=http://localhost:9123
+export SUI_GRAPHQL_URL=http://localhost:8000/graphql
+# Run ./init_audit_trail.sh to initialize the AuditTrail and populate AUDIT_TRAIL_OBJ_ID

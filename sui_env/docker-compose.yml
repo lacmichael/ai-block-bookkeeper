@@ -1,0 +1,172 @@
+services:
+  sui-localnet:
+    build:
+      context: ./infra/sui
+      dockerfile: Dockerfile.sui
+    ports:
+      - "9000:9000"   # JSON-RPC (deprecated, for compatibility)
+      - "9123:9123"   # Faucet
+      - "9184:9184"   # gRPC (future-ready)
+    environment:
+      RUST_LOG: "off,sui_node=info"
+    volumes:
+      - sui_data:/root/.sui
+    command: ["start", "--with-faucet", "--force-regenesis", "--data-ingestion-dir", "/root/.sui/checkpoints"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf -X POST http://127.0.0.1:9000 -H 'content-type: application/json' -d '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"sui_getTotalTransactionBlocks\",\"params\":[]}' >/dev/null || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 60
+      start_period: 20s
+
+  postgres:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: sui
+      POSTGRES_PASSWORD: sui
+      POSTGRES_DB: sui_indexer
+      # Performance tuning for indexer workload
+      POSTGRES_SHARED_BUFFERS: 256MB
+      POSTGRES_EFFECTIVE_CACHE_SIZE: 1GB
+      POSTGRES_MAX_CONNECTIONS: 100
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_buffers=256MB"
+      - "-c"
+      - "effective_cache_size=1GB"
+      - "-c"
+      - "max_connections=100"
+      - "-c"
+      - "work_mem=16MB"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sui -d sui_indexer"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+  sui-indexer-init:
+    build:
+      context: ./infra/sui
+      dockerfile: Dockerfile.sui
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      RUST_LOG: "info"
+    entrypoint: ["bash"]
+    command:
+      - "-c"
+      - |
+        # Run migrations first
+        sui-indexer --database-url postgresql://sui:sui@postgres:5432/sui_indexer run-migrations
+        # Reset database for fresh start (since we use --force-regenesis)
+        sui-indexer --database-url postgresql://sui:sui@postgres:5432/sui_indexer reset-database --force
+    restart: "no"
+
+  sui-indexer:
+    build:
+      context: ./infra/sui
+      dockerfile: Dockerfile.sui
+    depends_on:
+      sui-localnet:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      sui-indexer-init:
+        condition: service_completed_successfully
+    environment:
+      # General-purpose Indexer configuration
+      RUST_LOG: "info,sui_indexer=info,sui_data_ingestion_core=info"
+      # Connection pool settings for better performance
+      DB_POOL_SIZE: "20"
+    volumes:
+      - sui_data:/root/.sui
+    entrypoint: ["sui-indexer"]
+    command:
+      - "--database-url"
+      - "postgresql://sui:sui@postgres:5432/sui_indexer"
+      - "indexer"
+      - "--data-ingestion-path"
+      - "/root/.sui/checkpoints"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h postgres -U sui -d sui_indexer"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  sui-graphql:
+    build:
+      context: ./infra/sui
+      dockerfile: Dockerfile.sui
+    depends_on:
+      sui-indexer:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8000:8000"   # GraphQL RPC (Beta)
+    environment:
+      # GraphQL RPC Service configuration
+      RUST_LOG: "info,sui_graphql_rpc=info"
+    entrypoint: ["sui-graphql-rpc"]
+    command:
+      - "start-server"
+      - "--db-url"
+      - "postgresql://sui:sui@postgres:5432/sui_indexer"
+      - "--node-rpc-url"
+      - "http://sui-localnet:9000"
+      - "--host"
+      - "0.0.0.0"
+      - "--port"
+      - "8000"
+      - "--db-pool-size"
+      - "30"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8000/graphql -H 'content-type: application/json' -d '{\"query\":\"{chainIdentifier}\"}' >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  sui-cli:
+    build:
+      context: ./infra/sui
+      dockerfile: Dockerfile.sui
+    depends_on:
+      sui-localnet:
+        condition: service_healthy
+    volumes:
+      - move_cache:/root/.move
+    tty: true
+    stdin_open: true
+    entrypoint: ["/bin/bash"]
+    command: []
+
+volumes:
+  sui_data:
+  move_cache:
+  postgres_data:
+  pgadmin_data:

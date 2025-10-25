@@ -12,16 +12,26 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
 WORKDIR /opt
 RUN git clone --depth 1 https://github.com/MystenLabs/sui.git
 WORKDIR /opt/sui
-RUN cargo build --release -p sui
+RUN cargo build --release -p sui -p sui-indexer -p sui-graphql-rpc
 
 FROM debian:bullseye-slim
-RUN apt-get update && apt-get install -y ca-certificates curl bash git && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    curl \
+    bash \
+    git && rm -rf /var/lib/apt/lists/*
+
 COPY --from=builder /opt/sui/target/release/sui /usr/local/bin/sui
+COPY --from=builder /opt/sui/target/release/sui-indexer /usr/local/bin/sui-indexer
+COPY --from=builder /opt/sui/target/release/sui-graphql-rpc /usr/local/bin/sui-graphql-rpc
+
 RUN git config --global http.postBuffer 524288000 && \
     git config --global http.lowSpeedLimit 1000 && \
     git config --global http.lowSpeedTime 600 && \
     git config --global fetch.depth 1 && \
     git config --global clone.depth 1
-EXPOSE 9000
-ENTRYPOINT ["bash","-lc"]
-CMD ["sui start --with-faucet --force-regenesis"]
+
+EXPOSE 9000 9123 9184
+ENTRYPOINT ["sui"]
+CMD ["start", "--with-faucet", "--force-regenesis"]
+
