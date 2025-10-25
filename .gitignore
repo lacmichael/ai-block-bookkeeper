@@ -21,6 +21,8 @@ backend/.hypothesis/
 backend/.env
 backend/.env.local
 backend/.env.*.local
+backend/.env.example
+backend/env_template.txt
 
 # Uploads and temporary files
 backend/uploads/
@@ -167,3 +169,15 @@ dist
 # Temporary folders
 tmp/
 temp/
+
+# FastAPI specific
+backend/.fastapi/
+backend/staticfiles/
+
+# Supabase specific
+backend/supabase/
+backend/.supabase/
+
+# Health check and test files (optional - you might want to keep these)
+# backend/health_check.py
+# backend/test_connection.py

@@ -6,8 +6,11 @@ python-dotenv==1.0.1
 # Data validation and models
 pydantic==2.10.6
 
-# Supabase client
-supabase==2.3.0
+# HTTP client (compatible with Supabase 2.3.0)
+httpx[http2]>=0.24.0,<0.25.0
+
+# Supabase client (using older stable version)
+supabase==1.0.4
 
 # Structured logging
 structlog==23.2.0
