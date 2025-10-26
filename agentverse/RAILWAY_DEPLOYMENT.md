@@ -48,6 +48,15 @@ https://railway.app
 4. **Important**: Set "Root Directory" to `agentverse/reconciliation-agent`
 5. Click "Deploy"
 
+### **Step 3.5: Verify Root Directory**
+
+**CRITICAL**: Make sure you set the Root Directory correctly:
+- ✅ `agentverse/audit-agent` (not just `audit-agent`)
+- ✅ `agentverse/document-agent` (not just `document-agent`)  
+- ✅ `agentverse/reconciliation-agent` (not just `reconciliation-agent`)
+
+This tells Railway to look inside the `agentverse/` folder for each agent's deployment files.
+
 ### **Step 4: Get Your Public URLs**
 
 After deployment, Railway will give you URLs like:
