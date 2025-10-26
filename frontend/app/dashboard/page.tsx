@@ -4,7 +4,7 @@ import { CashFlowChart } from "@/components/dashboard/CashFlowChart";
 import { TransactionsByTypeChart } from "@/components/dashboard/TransactionsByTypeChart";
 import { ReconciliationStatusChart } from "@/components/dashboard/ReconciliationStatusChart";
 import { TransactionsTable } from "@/components/dashboard/TransactionsTable";
-import { getBusinessEvents } from "@/lib/actions/business-events";
+import { getBusinessEvents } from "@/utils/actions/business-events";
 
 export default async function DashboardPage() {
   // Fetch business events from Supabase

@@ -3,15 +3,13 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartTooltip, ChartLegend } from "@/components/ui/chart";
 import { PieChart, Pie, Cell } from "recharts";
-import { mockReconciliationData, formatCurrency } from "@/lib/mockData";
+import { mockReconciliationData, formatCurrency } from "@/utils/mockData";
 
 const COLORS = [
   "#10b981", // Reconciled - Green
   "#ef4444", // Unreconciled - Red
   "#f59e0b", // Partial - Yellow
 ];
-
-const chartConfig = {};
 
 export function ReconciliationStatusChart() {
   return (
@@ -32,7 +30,7 @@ export function ReconciliationStatusChart() {
               dataKey="value"
               nameKey="status"
             >
-              {mockReconciliationData.map((entry, index) => (
+              {mockReconciliationData.map((_entry, index) => (
                 <Cell
                   key={`cell-${index}`}
                   fill={COLORS[index % COLORS.length]}

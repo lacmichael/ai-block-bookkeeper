@@ -3,12 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartTooltip, ChartLegend } from "@/components/ui/chart";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
-import { mockChartData, formatCurrency } from "@/lib/mockData";
-
-const chartConfig = {
-  revenue: "primary",
-  expenses: "secondary",
-};
+import { mockChartData, formatCurrency } from "@/utils/mockData";
 
 export function RevenueExpenseChart() {
   return (

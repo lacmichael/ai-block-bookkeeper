@@ -3,12 +3,12 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils/utils";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { navigationItems, type NavigationItem } from "@/lib/navigation";
+import { navigationItems } from "@/utils/navigation";
 import { signOut } from "@/app/login/actions";
-import { User, Menu, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { User, ChevronLeft, ChevronRight } from "lucide-react";
 
 interface SidebarProps {
   user: {

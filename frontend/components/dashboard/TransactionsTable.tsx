@@ -13,8 +13,8 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
-import { formatCurrency } from "@/lib/mockData";
-import { BusinessEvent } from "@/lib/actions/business-events";
+import { formatCurrency } from "@/utils/mockData";
+import { BusinessEvent } from "@/utils/actions/business-events";
 import { PartyInfo } from "./PartyInfo";
 
 interface TransactionsTableProps {

@@ -1,6 +1,5 @@
-import { Sidebar } from "./sidebar";
 import { AuthenticatedLayoutClient } from "./authenticated-layout-client";
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 
 interface AuthenticatedLayoutProps {

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/utils/supabase/server";
 
 export default async function Home() {
   const supabase = await createClient();

@@ -3,11 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartTooltip } from "@/components/ui/chart";
 import { Line, LineChart, CartesianGrid, XAxis, YAxis } from "recharts";
-import { mockChartData, formatCurrency } from "@/lib/mockData";
-
-const chartConfig = {
-  cashFlow: "tertiary",
-};
+import { mockChartData, formatCurrency } from "@/utils/mockData";
 
 export function CashFlowChart() {
   return (

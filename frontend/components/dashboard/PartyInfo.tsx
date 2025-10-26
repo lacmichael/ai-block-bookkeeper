@@ -1,6 +1,6 @@
 "use client";
 
-import { Party } from "@/lib/actions/business-events";
+import { Party } from "@/utils/actions/business-events";
 import { Badge } from "@/components/ui/badge";
 import {
   Popover,

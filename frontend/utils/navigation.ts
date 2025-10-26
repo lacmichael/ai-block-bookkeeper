@@ -1,9 +1,6 @@
 import {
   LayoutDashboard,
   FileText,
-  BarChart3,
-  Settings,
-  Users,
   Receipt,
   Shield,
 } from "lucide-react";

@@ -3,7 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartTooltip, ChartLegend } from "@/components/ui/chart";
 import { PieChart, Pie, Cell } from "recharts";
-import { mockTransactionTypeData, formatCurrency } from "@/lib/mockData";
+import { mockTransactionTypeData, formatCurrency } from "@/utils/mockData";
 
 const COLORS = [
   "#10b981", // Green
@@ -12,8 +12,6 @@ const COLORS = [
   "#ef4444", // Red
   "#8b5cf6", // Purple
 ];
-
-const chartConfig = {};
 
 export function TransactionsByTypeChart() {
   return (
@@ -25,7 +23,7 @@ export function TransactionsByTypeChart() {
         <div className="h-[300px] w-full flex items-center justify-center">
           <PieChart width={300} height={300}>
             <Pie
-              data={mockTransactionTypeData}
+              data={mockTransactionTypeData as any}
               cx="50%"
               cy="50%"
               labelLine={false}
@@ -34,7 +32,7 @@ export function TransactionsByTypeChart() {
               dataKey="value"
               nameKey="type"
             >
-              {mockTransactionTypeData.map((entry, index) => (
+              {mockTransactionTypeData.map((_entry, index) => (
                 <Cell
                   key={`cell-${index}`}
                   fill={COLORS[index % COLORS.length]}
