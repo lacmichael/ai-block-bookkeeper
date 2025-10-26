@@ -141,7 +141,7 @@ async def insert_business_event(client: Client, event_data: Dict[str, Any]) -> s
         raise
 
 
-def transform_document_to_db(document: DocumentMetadata, business_event_id: str, sui_digest: str) -> Dict[str, Any]:
+def transform_document_to_db(document: DocumentMetadata, business_event_id: str, sui_digest: str, file_path: str = None) -> Dict[str, Any]:
     """Transform DocumentMetadata model to database row format"""
     doc_data = {
         "document_id": document.document_id,
@@ -157,6 +157,7 @@ def transform_document_to_db(document: DocumentMetadata, business_event_id: str,
         "extraction_confidence": float(document.extraction_confidence) if document.extraction_confidence else None,
         "onchain_hash_recorded": True,  # Mark as recorded on chain
         "onchain_digest": sui_digest,
+        "file_path": file_path,  # Store local file path
     }
     
     return doc_data
@@ -184,12 +185,12 @@ async def insert_document_metadata(client: Client, doc_data: Dict[str, Any]) -> 
         raise
 
 
-async def insert_invoice_to_supabase(business_event: BusinessEvent, sui_digest: str):
+async def insert_invoice_to_supabase(business_event: BusinessEvent, sui_digest: str, file_path: str = None):
     """
     Orchestrate all database inserts for an invoice:
     1. Upsert parties (vendor and payer)
     2. Insert business_event with POSTED_ONCHAIN state
-    3. Insert document_metadata with onchain_digest
+    3. Insert document_metadata with onchain_digest and file_path
     
     This function ensures all related data is inserted in the correct order.
     """
@@ -220,13 +221,14 @@ async def insert_invoice_to_supabase(business_event: BusinessEvent, sui_digest: 
         event_data = transform_business_event_to_db(business_event, sui_digest)
         await insert_business_event(client, event_data)
         
-        # Step 3: Insert document_metadata with onchain_digest
+        # Step 3: Insert document_metadata with onchain_digest and file_path
         if business_event.documents and len(business_event.documents) > 0:
             logger.info(f"Inserting document_metadata for {len(business_event.documents)} document(s)")
             doc_data = transform_document_to_db(
                 business_event.documents[0],
                 business_event.event_id,
-                sui_digest
+                sui_digest,
+                file_path
             )
             await insert_document_metadata(client, doc_data)
             logger.info(f"✓ Document metadata inserted successfully")

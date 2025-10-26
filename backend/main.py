@@ -14,6 +14,7 @@ from typing import Dict, Optional
 from uuid import uuid4
 
 from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
@@ -35,6 +36,15 @@ app = FastAPI(
     title="AI Block Bookkeeper",
     description="Document processing and blockchain audit service",
     version="1.0.0"
+)
+
+# Add CORS middleware for frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Global state for tracking responses
@@ -183,6 +193,17 @@ async def get_agent_info():
     )
 
 
+@app.get("/document/{document_id}")
+async def get_document(document_id: str):
+    """Retrieve a stored document by document_id"""
+    from fastapi.responses import FileResponse
+    
+    upload_dir = Path("backend/uploads")
+    for file in upload_dir.glob(f"{document_id}_*"):
+        return FileResponse(file)
+    raise HTTPException(status_code=404, detail="Document not found")
+
+
 @app.post("/process-document", response_model=ProcessDocumentResponse)
 async def process_document(
     file: UploadFile = File(...),
@@ -211,9 +232,9 @@ async def process_document(
         # Calculate file hash for tracking
         file_hash = hashlib.sha256(content).hexdigest()
         
-        # Save file temporarily
-        temp_dir = Path("/tmp/ai-block-bookkeeper")
-        temp_dir.mkdir(exist_ok=True)
+        # Save file to persistent storage
+        temp_dir = Path("backend/uploads")
+        temp_dir.mkdir(parents=True, exist_ok=True)
         
         file_path = temp_dir / f"{document_id}_{file.filename}"
         with open(file_path, "wb") as f:
@@ -306,7 +327,7 @@ async def process_document(
         # Step 3: Insert to Supabase
         try:
             business_event = BusinessEvent(**doc_response.business_event)
-            await insert_invoice_to_supabase(business_event, sui_result["sui_digest"])
+            await insert_invoice_to_supabase(business_event, sui_result["sui_digest"], str(file_path))
             logger.info(f"✓ Data inserted to Supabase")
             supabase_inserted = True
         except Exception as e:
@@ -351,12 +372,6 @@ async def process_document(
         # Clean up pending request
         if document_id in pending_requests:
             del pending_requests[document_id]
-        
-        # Clean up temp file
-        try:
-            file_path.unlink()
-        except Exception as e:
-            logger.warning(f"Failed to delete temp file: {e}")
         
         result["processing_time_seconds"] = time.time() - start_time
         
