@@ -1,7 +1,27 @@
-import { type NextRequest } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { updateSession } from "@/utils/supabase/middleware";
 
 export async function middleware(request: NextRequest) {
+  // Check for wallet JWT token
+  const walletToken = request.cookies.get("wallet_auth_token")?.value || 
+                      request.headers.get("authorization")?.replace("Bearer ", "");
+
+  if (walletToken) {
+    try {
+      // Decode JWT payload (basic check without verification)
+      const payload = JSON.parse(atob(walletToken.split(".")[1]));
+      const exp = payload.exp * 1000;
+      
+      // If token is valid, allow access
+      if (Date.now() < exp) {
+        return NextResponse.next();
+      }
+    } catch (e) {
+      // Invalid token, continue to Supabase check
+    }
+  }
+
+  // Fall back to Supabase session check
   return await updateSession(request);
 }
 

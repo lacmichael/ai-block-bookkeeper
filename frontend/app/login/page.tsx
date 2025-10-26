@@ -8,7 +8,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 import { signInWithGoogle } from "./actions";
+import { WalletConnectButton } from "@/components/auth/wallet-connect-button";
 
 export default async function LoginPage() {
   const supabase = await createClient();
@@ -56,6 +58,15 @@ export default async function LoginPage() {
               Continue with Google
             </Button>
           </form>
+
+          <div className="relative">
+            <Separator className="my-4" />
+            <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-2 text-xs text-muted-foreground">
+              or
+            </span>
+          </div>
+
+          <WalletConnectButton />
         </CardContent>
       </Card>
     </div>

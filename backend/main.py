@@ -27,6 +27,9 @@ from agents.document_processing_agent import agent as doc_agent
 from agents.document_processing.models import DocumentProcessingRequest, DocumentProcessingResponse
 from agents.shared_models import AuditResponse
 
+# Import wallet auth routes
+from api.routes import wallet_auth
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -46,6 +49,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include wallet auth routes
+app.include_router(wallet_auth.router)
 
 # Global state for tracking responses
 pending_requests: Dict[str, asyncio.Future] = {}

@@ -2,7 +2,6 @@
 
 import { Button } from "@/components/ui/button";
 import { Menu, X } from "lucide-react";
-import { cn } from "@/utils/utils";
 
 interface MobileHeaderProps {
   onToggleSidebar: () => void;

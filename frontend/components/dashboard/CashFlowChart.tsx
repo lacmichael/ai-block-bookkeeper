@@ -5,10 +5,6 @@ import { ChartTooltip } from "@/components/ui/chart";
 import { Line, LineChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { mockChartData, formatCurrency } from "@/utils/mockData";
 
-const chartConfig = {
-  cashFlow: "tertiary",
-};
-
 export function CashFlowChart() {
   return (
     <Card>
