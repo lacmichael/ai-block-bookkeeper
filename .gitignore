@@ -240,10 +240,6 @@ Icon?
 .fastapi/
 staticfiles/
 
-# Supabase specific
-supabase/
-.supabase/
-
 # Runtime data
 pids
 *.pid

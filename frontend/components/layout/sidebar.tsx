@@ -4,9 +4,10 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/utils/utils";
+import { cn } from "@/utils/utils";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { navigationItems } from "@/utils/navigation";
+import { navigationItems, type NavigationItem } from "@/utils/navigation";
 import { signOut } from "@/app/login/actions";
 import { User, ChevronLeft, ChevronRight } from "lucide-react";
 
