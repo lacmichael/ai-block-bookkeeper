@@ -10,7 +10,8 @@ pydantic>=2.8,<2.9
 httpx[http2]>=0.26.0,<0.29.0
 
 # Supabase client (using newer version compatible with httpx 0.25+)
-supabase
+supabase==2.22.2
+realtime==1.0.3
 
 # Structured logging
 structlog==23.2.0

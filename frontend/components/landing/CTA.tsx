@@ -74,7 +74,7 @@ export default function CtaSection() {
           {/* MVP Launch Indicator */}
           <div className="flex items-center justify-center gap-2 text-muted-foreground mb-8">
             <Calendar className="w-5 h-5" />
-            <span className="text-sm">MVP Launch: Q2 2024</span>
+            <span className="text-sm">MVP Launch: Q4 2025</span>
           </div>
 
           {/* Additional CTAs */}
