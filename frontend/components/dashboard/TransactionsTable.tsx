@@ -16,6 +16,7 @@ import { ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { formatCurrency } from "@/utils/mockData";
 import { BusinessEvent } from "@/utils/actions/business-events";
 import { PartyInfo } from "./PartyInfo";
+import Link from "next/link";
 
 interface TransactionsTableProps {
   businessEvents: BusinessEvent[];
@@ -246,9 +247,11 @@ export function TransactionsTable({ businessEvents }: TransactionsTableProps) {
                   {getStatusBadge(transaction.reconciliation_state)}
                 </TableCell>
                 <TableCell>
-                  <Button variant="outline" size="sm">
-                    View
-                  </Button>
+                  <Link href={`/transactions/${transaction.event_id}`}>
+                    <Button variant="outline" size="sm">
+                      View
+                    </Button>
+                  </Link>
                 </TableCell>
               </TableRow>
             ))}
