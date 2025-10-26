@@ -76,6 +76,24 @@ def test_process_document(file_path: str):
                 print(f"  Success: {result['success']}")
                 print(f"  Processing Time: {result['processing_time_seconds']:.2f}s")
                 
+                # Check for Sui blockchain posting
+                if result.get('sui_digest'):
+                    print(f"\n  Blockchain:")
+                    print(f"    ✓ Sui Transaction Posted")
+                    print(f"    Digest: {result['sui_digest']}")
+                else:
+                    print(f"\n  Blockchain:")
+                    print(f"    ✗ No Sui digest found")
+                
+                # Check for Supabase insertion
+                if result.get('supabase_inserted'):
+                    print(f"\n  Database:")
+                    print(f"    ✓ Data inserted to Supabase")
+                else:
+                    print(f"\n  Database:")
+                    print(f"    ✗ Supabase insert failed or skipped")
+                
+                # Show extracted business event details
                 if result.get('document_processing'):
                     doc_proc = result['document_processing']
                     print(f"\n  Document Processing:")
@@ -92,9 +110,10 @@ def test_process_document(file_path: str):
                             confidence = docs[0].get('extraction_confidence', 0.0)
                             print(f"    Confidence: {confidence:.2%}")
                 
+                # Legacy blockchain audit check (for backward compatibility)
                 if result.get('blockchain_audit'):
                     audit = result['blockchain_audit']
-                    print(f"\n  Blockchain Audit:")
+                    print(f"\n  Legacy Blockchain Audit:")
                     
                     if audit.get('skipped'):
                         print(f"    Skipped: {audit['reason']}")

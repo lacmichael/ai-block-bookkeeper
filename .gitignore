@@ -94,7 +94,7 @@ pdm.lock
 .pdm.toml
 
 # Move (Sui blockchain)
-sui_env/Move.lock
+sui_env/move/financial_audit/Move.lock
 sui_env/.sui-config
 
 # PEP 582

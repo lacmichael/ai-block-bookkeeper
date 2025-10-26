@@ -47,8 +47,10 @@ class ProcessDocumentResponse(BaseModel):
     document_id: str
     success: bool
     processing_time_seconds: float
+    sui_digest: Optional[str] = None  # Sui transaction digest
+    supabase_inserted: bool = False   # Whether data was inserted to Supabase
     document_processing: Optional[Dict] = None
-    blockchain_audit: Optional[Dict] = None
+    blockchain_audit: Optional[Dict] = None  # Legacy field for backward compatibility
     error_message: Optional[str] = None
 
 
@@ -80,11 +82,9 @@ async def start_agents_in_background():
         load_config_from_env,
         Agent as UAAgent,
         Context,
-        process_and_post_event,
-        BusinessEvent,
-        DocumentMetadata
+        handle_audit_request_logic
     )
-    from agents.shared_models import BusinessEventMessage, AuditResponse
+    from agents.document_processing.models import AuditVerificationRequest, AuditVerificationResponse
     
     config = load_config_from_env()
     
@@ -103,60 +103,39 @@ async def start_agents_in_background():
         ctx.logger.info("=" * 60)
         ctx.logger.info(f"Agent address: {audit_agent.address}")
         ctx.logger.info(f"Listening on port: {os.environ.get('AGENT_PORT', '8001')}")
-        ctx.logger.info("Ready to receive BusinessEvent messages for blockchain posting")
+        ctx.logger.info("Ready to receive AuditVerificationRequest messages")
         ctx.logger.info("=" * 60)
     
-    @audit_agent.on_message(model=BusinessEventMessage)
-    async def handle_business_event(ctx, sender: str, msg: BusinessEventMessage):
-        """Handle incoming BusinessEvent from Document Processing Agent"""
-        ctx.logger.info(f"Received BusinessEvent {msg.event_id} from {sender}")
-        ctx.logger.info(f"Confidence score: {msg.confidence_score:.2f}")
+    @audit_agent.on_message(model=AuditVerificationRequest)
+    async def handle_audit_request(ctx, sender: str, msg: AuditVerificationRequest):
+        """Handle incoming AuditVerificationRequest from Document Processing Agent"""
+        ctx.logger.info(f"Received audit request {msg.request_id} from {sender}")
         
-        # Convert dict back to BusinessEvent object
-        event_dict = msg.business_event
-        doc_meta_dict = event_dict.get('documents', [{}])[0] if event_dict.get('documents') else {}
+        # Use the shared logic function from audit_verification_agent
+        result = await handle_audit_request_logic(msg.business_event, msg.request_id, config)
         
-        event = BusinessEvent(
-            event_id=event_dict['event_id'],
-            amount_minor=event_dict['amount_minor'],
-            occurred_at=datetime.fromisoformat(event_dict['occurred_at'].replace('Z', '+00:00')),
-            document_meta=DocumentMetadata(sha256=doc_meta_dict.get('sha256', '')),
-            event_kind=event_dict.get('event_kind', 'transfer')
+        # Send response back to document agent
+        response = AuditVerificationResponse(
+            request_id=msg.request_id,
+            success=result["success"],
+            sui_digest=result.get("sui_digest"),
+            error_message=result.get("error_message")
         )
         
-        # Post to blockchain
-        ctx.logger.info(f"Posting event {event.event_id} to blockchain...")
-        result = await process_and_post_event(event, config)
-        
-        # Send response back to sender
-        if result.get('success'):
-            ctx.logger.info(f"✓ Successfully posted event {msg.event_id} to blockchain")
-            response = AuditResponse(
-                event_id=msg.event_id,
-                document_id=msg.document_id,
-                success=True,
-                transaction_digest=result.get('digest'),
-                blockchain_output=result.get('output')
-            )
-        else:
-            ctx.logger.error(f"✗ Failed to post event {msg.event_id} to blockchain")
-            response = AuditResponse(
-                event_id=msg.event_id,
-                document_id=msg.document_id,
-                success=False,
-                error_message=result.get('error', 'Unknown error'),
-                blockchain_output=result.get('output')
-            )
-        
         await ctx.send(sender, response)
-        ctx.logger.info(f"Sent audit response back to {sender}")
+        ctx.logger.info(f"Sent audit response for {msg.request_id}: success={result['success']}")
     
     # Start audit agent as background task
     asyncio.create_task(audit_agent.run_async())
     logger.info(f"✓ Audit Verification Agent started (address: {audit_agent.address})")
     
-    # Store audit agent address for later use
+    # Store audit agent address for later use - doc agent needs this to send messages
     os.environ["AUDIT_AGENT_ADDRESS"] = audit_agent.address
+    
+    # Update document agent's AUDIT_AGENT_ADDRESS
+    import agents.document_processing_agent as doc_agent_module
+    doc_agent_module.AUDIT_AGENT_ADDRESS = audit_agent.address
+    logger.info(f"✓ Configured document agent to send to audit agent: {audit_agent.address}")
     
     # Give agents time to initialize
     await asyncio.sleep(2)
@@ -210,8 +189,11 @@ async def process_document(
     requester_id: str = "api-user"
 ):
     """
-    Process a document and post to blockchain if confidence threshold is met.
-    Waits for the complete pipeline to finish before responding.
+    Process a document through the agent pipeline:
+    1. Document agent extracts invoice data
+    2. Document agent sends to audit agent for Sui posting  
+    3. Document agent inserts to Supabase if Sui succeeds
+    4. Returns complete response with sui_digest and supabase_inserted status
     """
     if not agent_threads_started:
         raise HTTPException(status_code=503, detail="Agents not yet initialized")
@@ -264,28 +246,18 @@ async def process_document(
             metadata={"file_hash": file_hash}
         )
         
-        # Create a future to wait for the complete pipeline
-        response_future = asyncio.get_event_loop().create_future()
-        pending_requests[document_id] = response_future
+        # Since we're in the same process, process synchronously:
+        # 1. Extract invoice data
+        # 2. Post to Sui blockchain  
+        # 3. Insert to Supabase if Sui succeeds
+        logger.info(f"Processing document {document_id} synchronously...")
         
-        # Send to document processing agent
-        logger.info(f"Sending document {document_id} to processing agent...")
-        
-        # We need to send the message via the agent's internal messaging
-        # Since we're running in the same process, we can use the agent's send method
-        # However, we need to handle the response collection differently
-        
-        # For MVP, we'll use a simpler approach: directly call the processing client
-        # and then the audit posting if confidence is high enough
         from agents.document_processing_client import DocumentProcessingClient
-        from agents.audit_verification_agent import (
-            process_and_post_event,
-            load_config_from_env,
-            BusinessEvent,
-            DocumentMetadata
-        )
+        from agents.audit_verification_agent import handle_audit_request_logic, load_config_from_env
+        from agents.database_operations import insert_invoice_to_supabase
+        from models.domain_models import BusinessEvent
         
-        # Process document directly
+        # Step 1: Extract invoice data
         anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
         if not anthropic_api_key:
             raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY not configured")
@@ -293,10 +265,71 @@ async def process_document(
         processing_client = DocumentProcessingClient(anthropic_api_key)
         doc_response = await processing_client.process_document(request)
         
+        if not doc_response.success:
+            # Extraction failed
+            return ProcessDocumentResponse(
+                document_id=document_id,
+                success=False,
+                processing_time_seconds=time.time() - start_time,
+                error_message=doc_response.error_message
+            )
+        
+        logger.info(f"✓ Invoice extracted successfully")
+        
+        # Step 2: Post to Sui blockchain
+        config = load_config_from_env()
+        sui_result = await handle_audit_request_logic(
+            doc_response.business_event,
+            document_id,
+            config
+        )
+        
+        if not sui_result["success"]:
+            # Sui posting failed
+            logger.error(f"✗ Sui posting failed: {sui_result.get('error_message')}")
+            return ProcessDocumentResponse(
+                document_id=document_id,
+                success=False,
+                processing_time_seconds=time.time() - start_time,
+                sui_digest=None,
+                supabase_inserted=False,
+                error_message=f"Blockchain posting failed: {sui_result.get('error_message')}",
+                document_processing={
+                    "success": doc_response.success,
+                    "business_event": doc_response.business_event,
+                    "extracted_data": doc_response.extracted_data
+                }
+            )
+        
+        logger.info(f"✓ Sui transaction posted: {sui_result.get('sui_digest')}")
+        
+        # Step 3: Insert to Supabase
+        try:
+            business_event = BusinessEvent(**doc_response.business_event)
+            await insert_invoice_to_supabase(business_event, sui_result["sui_digest"])
+            logger.info(f"✓ Data inserted to Supabase")
+            supabase_inserted = True
+        except Exception as e:
+            logger.error(f"✗ Supabase insert failed: {str(e)}")
+            supabase_inserted = False
+        
+        doc_response = DocumentProcessingResponse(
+            document_id=document_id,
+            success=True,
+            processing_time_seconds=doc_response.processing_time_seconds,
+            business_event=doc_response.business_event,
+            extracted_data=doc_response.extracted_data,
+            sui_digest=sui_result["sui_digest"],
+            supabase_inserted=supabase_inserted
+        )
+        
+        # Build result from agent response
         result = {
             "document_id": document_id,
             "success": doc_response.success,
             "processing_time_seconds": time.time() - start_time,
+            "sui_digest": doc_response.sui_digest,
+            "supabase_inserted": doc_response.supabase_inserted,
             "document_processing": {
                 "success": doc_response.success,
                 "business_event": doc_response.business_event,
@@ -306,65 +339,14 @@ async def process_document(
             }
         }
         
-        # If document processing succeeded and confidence is high, post to blockchain
-        if doc_response.success and doc_response.business_event:
-            documents = doc_response.business_event.get('documents', [])
-            confidence = documents[0].get('extraction_confidence', 0.0) if documents else 0.0
-            
-            logger.info(f"Document processing confidence: {confidence:.2f}")
-            
-            if confidence >= 0.80:
-                logger.info("Confidence threshold met - posting to blockchain...")
-                
-                # Convert to BusinessEvent object
-                event_dict = doc_response.business_event
-                doc_meta_dict = documents[0] if documents else {}
-                
-                # Ensure amount_minor is an integer
-                amount_minor = event_dict['amount_minor']
-                if isinstance(amount_minor, str):
-                    amount_minor = int(amount_minor)
-                
-                # Parse occurred_at - handle both string and datetime objects
-                occurred_at = event_dict['occurred_at']
-                if isinstance(occurred_at, str):
-                    occurred_at = datetime.fromisoformat(occurred_at.replace('Z', '+00:00'))
-                elif isinstance(occurred_at, datetime):
-                    occurred_at = occurred_at
-                else:
-                    occurred_at = datetime.utcnow()
-                
-                event = BusinessEvent(
-                    event_id=event_dict['event_id'],
-                    amount_minor=amount_minor,
-                    occurred_at=occurred_at,
-                    document_meta=DocumentMetadata(sha256=doc_meta_dict.get('sha256', '')),
-                    event_kind=event_dict.get('event_kind', 'transfer')
-                )
-                
-                # Post to blockchain
-                config = load_config_from_env()
-                audit_result = await process_and_post_event(event, config)
-                
-                result["blockchain_audit"] = {
-                    "success": audit_result.get('success'),
-                    "transaction_digest": audit_result.get('digest'),
-                    "output": audit_result.get('output'),
-                    "error": audit_result.get('error')
-                }
-                
-                if audit_result.get('success'):
-                    logger.info(f"✓ Successfully posted to blockchain: {audit_result.get('digest')}")
-                else:
-                    logger.error(f"✗ Blockchain posting failed: {audit_result.get('error')}")
-            else:
-                logger.info(f"Confidence {confidence:.2f} below threshold (0.80) - skipping blockchain")
-                result["blockchain_audit"] = {
-                    "skipped": True,
-                    "reason": f"Confidence {confidence:.2f} below threshold 0.80"
-                }
-        else:
+        if doc_response.error_message:
             result["error_message"] = doc_response.error_message
+        
+        # Log results
+        if doc_response.sui_digest:
+            logger.info(f"✓ Sui transaction posted: {doc_response.sui_digest}")
+        if doc_response.supabase_inserted:
+            logger.info(f"✓ Data inserted to Supabase")
         
         # Clean up pending request
         if document_id in pending_requests:

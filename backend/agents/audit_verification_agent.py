@@ -36,6 +36,17 @@ except Exception:  # pragma: no cover - allow tests to import without uagents
     Context = None
     Model = object
 
+# Import audit request/response models
+try:
+    import sys
+    import os
+    sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+    from document_processing.models import AuditVerificationRequest, AuditVerificationResponse
+except ImportError:
+    # Fallback if imports fail
+    AuditVerificationRequest = None
+    AuditVerificationResponse = None
+
 
 # Placeholder Pydantic-style models (lightweight)
 class DocumentMetadata:
@@ -195,16 +206,80 @@ def load_config_from_env() -> dict:
     }
 
 
+async def handle_audit_request_logic(event_dict: dict, request_id: str, config: dict):
+    """
+    Handle audit request logic - can be called from agent handler or directly.
+    Returns dict with success, digest, and error fields.
+    """
+    try:
+        # Create lightweight BusinessEvent for Sui posting
+        doc_meta = DocumentMetadata(sha256=event_dict["documents"][0]["sha256"])
+        
+        # Parse occurred_at - handle both string and datetime objects
+        occurred_at = event_dict["occurred_at"]
+        if isinstance(occurred_at, str):
+            occurred_at = datetime.fromisoformat(occurred_at.replace('Z', '+00:00'))
+        elif not isinstance(occurred_at, datetime):
+            # If it's neither string nor datetime, use current time
+            occurred_at = datetime.now(timezone.utc)
+        
+        event = BusinessEvent(
+            event_id=event_dict["event_id"],
+            amount_minor=event_dict["amount_minor"],
+            occurred_at=occurred_at,
+            document_meta=doc_meta,
+            event_kind=event_dict["event_kind"]
+        )
+        
+        # Post to Sui blockchain
+        result = await process_and_post_event(event, config)
+        
+        return {
+            "success": result["success"],
+            "sui_digest": result.get("digest"),
+            "error_message": result.get("error")
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "sui_digest": None,
+            "error_message": str(e)
+        }
+
+
 def main():
     config = load_config_from_env()
     # If uagents available, use on_interval handler; otherwise run simple loop once.
     if Agent is not None:
-        agent = Agent(name=AGENT_NAME, seed=os.environ.get("AGENT_SEED", "dev_seed"), endpoint=os.environ.get("AGENT_ENDPOINT", "127.0.0.1"), port=os.environ.get("AGENT_PORT", "8001"))
+        agent = Agent(name=AGENT_NAME, seed=os.environ.get("AGENT_SEED", "dev_seed"), endpoint=os.environ.get("AGENT_ENDPOINT", "127.0.0.1"), port=int(os.environ.get("AGENT_PORT", "8001")))
+
+        # Handler for audit verification requests from document agent
+        if AuditVerificationRequest and AuditVerificationResponse:
+            @agent.on_message(AuditVerificationRequest)
+            async def handle_audit_request(ctx: Context, sender: str, msg: AuditVerificationRequest):
+                """Receive BusinessEvent and post to Sui blockchain"""
+                print(f"[audit agent] Received audit request {msg.request_id} from {sender}")
+                
+                result = await handle_audit_request_logic(msg.business_event, msg.request_id, config)
+                
+                # Send response back to document agent
+                response = AuditVerificationResponse(
+                    request_id=msg.request_id,
+                    success=result["success"],
+                    sui_digest=result.get("sui_digest"),
+                    error_message=result.get("error_message")
+                )
+                
+                await ctx.send(sender, response)
+                print(f"[audit agent] Sent audit response for {msg.request_id}: success={result['success']}")
 
         @agent.on_interval(seconds=int(os.environ.get("AGENT_INTERVAL_SECONDS", "60")))
         async def periodic(_: Context):
             await _run_agent_loop(config)
 
+        print(f"[audit agent] Starting agent at port {agent.port}")
+        print(f"[audit agent] Agent address: {agent.address}")
         agent.run()
     else:
         # CLI fallback for environments without uagents installed
