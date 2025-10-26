@@ -139,7 +139,7 @@ async def verify_signature(request: VerifyRequest):
         # Mark nonce as used
         mark_nonce_used(request.nonce)
         
-        # Create user in Supabase if configured
+        # Create user in Supabase if configured and JWT secret is available
         if supabase and os.getenv("SUPABASE_JWT_SECRET"):
             try:
                 # Generate deterministic UUID for this wallet
@@ -167,6 +167,8 @@ async def verify_signature(request: VerifyRequest):
                     
             except Exception as e:
                 logger.warning(f"Supabase user creation failed: {e}")
+        else:
+            logger.info(f"Skipping Supabase user creation - JWT secret not configured (local dev mode)")
         
         # Generate JWT token (Supabase-compatible if secret is set)
         access_token = create_jwt_token(request.wallet_address)

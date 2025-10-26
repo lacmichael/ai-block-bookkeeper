@@ -34,6 +34,13 @@ def evaluate_match(
         payment_amount = counterpart.amount_minor
         invoice_id = event.event_id
         payment_id = counterpart.event_id
+    elif event.event_kind == 'INVOICE_SENT':
+        invoice_num = event.metadata.get('invoice_number')
+        payment_ref = counterpart.metadata.get('payment_reference')
+        invoice_amount = event.amount_minor
+        payment_amount = counterpart.amount_minor
+        invoice_id = event.event_id
+        payment_id = counterpart.event_id
     else:  # event.event_kind == 'PAYMENT_SENT'
         invoice_num = counterpart.metadata.get('invoice_number')
         payment_ref = event.metadata.get('payment_reference')

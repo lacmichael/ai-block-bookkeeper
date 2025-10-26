@@ -3,7 +3,6 @@
 import { useCurrentAccount, useSignPersonalMessage } from "@mysten/dapp-kit";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { createClient } from "@/utils/supabase/client";
 import {
   clearAuthToken,
   getWalletAddress,
@@ -63,12 +62,8 @@ export function useWalletAuth() {
         nonce
       );
 
-      // Step 4: Set Supabase session with the JWT token
-      const supabase = createClient();
-      await supabase.auth.setSession({
-        access_token: authData.access_token,
-        refresh_token: authData.access_token,
-      });
+      // Step 4: Store the JWT token (Supabase session not needed for wallet auth)
+      // The token is already stored by verifySignature function
 
       setIsAuthenticated(true);
       setIsAuthenticating(false);
@@ -83,8 +78,6 @@ export function useWalletAuth() {
   }, [currentAccount, signPersonalMessage]);
 
   const signOut = useCallback(async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
     clearAuthToken();
     setIsAuthenticated(false);
     router.push("/login");

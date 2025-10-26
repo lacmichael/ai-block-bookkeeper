@@ -32,7 +32,7 @@ class BusinessEvent(BaseModel):
     source_id: str
     occurred_at: datetime
     recorded_at: datetime
-    event_kind: Literal["BANK_POSTED", "INVOICE_RECEIVED", "PAYMENT_SENT", "REFUND", "ADJUSTMENT"]
+    event_kind: Literal["BANK_POSTED", "INVOICE_RECEIVED", "INVOICE_SENT", "PAYMENT_SENT", "REFUND", "ADJUSTMENT"]
     amount_minor: int  # Using int instead of bigint for JSON serialization
     currency: str
     description: Optional[str] = None

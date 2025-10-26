@@ -157,7 +157,6 @@ def transform_document_to_db(document: DocumentMetadata, business_event_id: str,
         "extraction_confidence": float(document.extraction_confidence) if document.extraction_confidence else None,
         "onchain_hash_recorded": True,  # Mark as recorded on chain
         "onchain_digest": sui_digest,
-        "file_path": file_path,  # Store local file path
     }
     
     return doc_data

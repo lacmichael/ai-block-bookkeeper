@@ -14,6 +14,7 @@ from .document_processing.models import (
     AuditVerificationRequest,
     AuditVerificationResponse
 )
+from .shared_models import ReconciliationRequest
 from .document_processing_client import DocumentProcessingClient
 from .database_operations import insert_invoice_to_supabase
 from models.domain_models import BusinessEvent
@@ -29,8 +30,9 @@ logger = logging.getLogger(__name__)
 # Store for tracking audit requests
 pending_audit_requests = {}
 
-# Get audit agent address from environment
+# Get agent addresses from environment
 AUDIT_AGENT_ADDRESS = os.getenv("AUDIT_AGENT_ADDRESS", "")
+RECONCILIATION_AGENT_ADDRESS = os.getenv("RECONCILIATION_AGENT_ADDRESS", "")
 
 # Create the agent
 agent = Agent(
@@ -138,6 +140,17 @@ async def handle_audit_response(ctx: Context, sender: str, msg: AuditVerificatio
             response.supabase_inserted = True
             logger.info(f"Successfully inserted {msg.request_id} to Supabase")
             
+            # Step 5: Trigger reconciliation if agent is configured
+            if RECONCILIATION_AGENT_ADDRESS:
+                reconciliation_request = ReconciliationRequest(
+                    event_id=msg.request_id,
+                    business_event=business_event_dict
+                )
+                await ctx.send(RECONCILIATION_AGENT_ADDRESS, reconciliation_request)
+                logger.info(f"Sent reconciliation request for {msg.request_id} to reconciliation agent")
+            else:
+                logger.warning("RECONCILIATION_AGENT_ADDRESS not configured - skipping reconciliation")
+            
         else:
             # Step 5: Sui posting failed - don't insert to Supabase
             logger.error(f"Sui posting failed for {msg.request_id}: {msg.error_message}")
@@ -166,6 +179,11 @@ async def startup(ctx: Context):
         logger.info(f"Audit agent address configured: {AUDIT_AGENT_ADDRESS}")
     else:
         logger.warning("⚠️  AUDIT_AGENT_ADDRESS not configured - Sui posting will be skipped")
+    
+    if RECONCILIATION_AGENT_ADDRESS:
+        logger.info(f"Reconciliation agent address configured: {RECONCILIATION_AGENT_ADDRESS}")
+    else:
+        logger.warning("⚠️  RECONCILIATION_AGENT_ADDRESS not configured - reconciliation will be skipped")
     
 
 @agent.on_event("shutdown")

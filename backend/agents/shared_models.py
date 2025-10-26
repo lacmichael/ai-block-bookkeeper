@@ -30,3 +30,25 @@ class AuditResponse(Model):
     error_message: Optional[str] = None
     blockchain_output: Optional[str] = None
 
+
+class ReconciliationRequest(Model):
+    """
+    Message sent to Reconciliation Agent to trigger reconciliation for a new transaction.
+    Sent from Document Processing Agent after successful blockchain posting.
+    """
+    event_id: str
+    business_event: Dict[str, Any]  # Full BusinessEvent as dict
+
+
+class ReconciliationResponse(Model):
+    """
+    Response sent from Reconciliation Agent back to requester.
+    Contains the result of reconciliation attempt.
+    """
+    event_id: str
+    success: bool
+    reconciliation_status: str  # RECONCILED, PARTIAL, UNRECONCILED
+    matched_event_id: Optional[str] = None
+    discrepancy: Optional[Dict[str, Any]] = None
+    error_message: Optional[str] = None
+

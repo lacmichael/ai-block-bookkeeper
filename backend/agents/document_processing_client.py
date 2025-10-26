@@ -236,6 +236,27 @@ class DocumentProcessingClient:
         
         return metadata
     
+    def determine_invoice_direction(self, extracted_data: Dict[str, Any]) -> str:
+        """Determine if invoice is incoming or outgoing based on user company name"""
+        user_company_name = os.getenv("USER_COMPANY_NAME", "").lower()
+        
+        if not user_company_name:
+            # Default to INVOICE_RECEIVED if no company name configured
+            return "INVOICE_RECEIVED"
+        
+        vendor_name = extracted_data.get("vendor_name", "").lower()
+        payer_name = extracted_data.get("payer_name", "").lower()
+        
+        # Check if user's company appears as the vendor (user is sending invoice)
+        if user_company_name in vendor_name:
+            return "INVOICE_SENT"
+        # Check if user's company appears as the payer (user is receiving invoice)
+        elif user_company_name in payer_name:
+            return "INVOICE_RECEIVED"
+        else:
+            # Default to received if unclear
+            return "INVOICE_RECEIVED"
+
     def create_business_event(
         self, 
         request: DocumentProcessingRequest, 
@@ -316,6 +337,9 @@ class DocumentProcessingClient:
         # Build comprehensive metadata
         metadata = self._build_metadata(extracted_data)
         
+        # Determine invoice direction based on user company name
+        event_kind = self.determine_invoice_direction(extracted_data)
+        
         # Create business event
         business_event = BusinessEvent(
             event_id=str(uuid.uuid4()),
@@ -323,7 +347,7 @@ class DocumentProcessingClient:
             source_id=extracted_data.get("invoice_number") or request.document_id,
             occurred_at=occurred_at,
             recorded_at=datetime.utcnow(),
-            event_kind="INVOICE_RECEIVED",
+            event_kind=event_kind,
             amount_minor=amount_minor,
             currency=extracted_data.get("currency") or "USD",
             description=description,
@@ -340,6 +364,7 @@ class DocumentProcessingClient:
         
         # Log comprehensive business event creation
         logger.info(f"Created BusinessEvent {business_event.event_id}:")
+        logger.info(f"  - Event Kind: {event_kind}")
         logger.info(f"  - Vendor/Payee: {extracted_data.get('vendor_name', 'N/A')}")
         logger.info(f"  - Payer: {extracted_data.get('payer_name', 'N/A')}")
         logger.info(f"  - Amount: {business_event.currency} {amount_minor/100:.2f}")

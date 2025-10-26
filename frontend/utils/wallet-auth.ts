@@ -7,11 +7,13 @@ export interface WalletAuthToken {
 }
 
 /**
- * Store JWT token in localStorage
+ * Store JWT token in localStorage and cookies
  */
 export function setAuthToken(token: string): void {
   if (typeof window !== "undefined") {
     localStorage.setItem("wallet_auth_token", token);
+    // Also set in cookies for server-side access
+    document.cookie = `wallet_auth_token=${token}; path=/; max-age=${24 * 60 * 60}; SameSite=Lax`;
   }
 }
 
@@ -26,11 +28,13 @@ export function getAuthToken(): string | null {
 }
 
 /**
- * Remove JWT token from localStorage
+ * Remove JWT token from localStorage and cookies
  */
 export function clearAuthToken(): void {
   if (typeof window !== "undefined") {
     localStorage.removeItem("wallet_auth_token");
+    // Clear cookie by setting it to expire in the past
+    document.cookie = "wallet_auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
   }
 }
 
@@ -60,7 +64,9 @@ export function getWalletAddress(): string | null {
 
   try {
     const payload = JSON.parse(atob(token.split(".")[1]));
-    return payload.sub || null;
+    // For custom JWT tokens, wallet address is in 'sub' field
+    // For Supabase tokens, it would be in user_metadata.wallet_address
+    return payload.sub || payload.user_metadata?.wallet_address || null;
   } catch {
     return null;
   }

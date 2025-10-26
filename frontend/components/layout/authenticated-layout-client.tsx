@@ -9,6 +9,7 @@ interface AuthenticatedLayoutClientProps {
   user: {
     email?: string;
     avatar_url?: string;
+    wallet_address?: string;
   };
 }
 

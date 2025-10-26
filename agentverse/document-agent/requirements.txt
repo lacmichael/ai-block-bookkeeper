@@ -1,0 +1,7 @@
+uagents
+python-dotenv
+anthropic
+supabase
+structlog
+pydantic
+httpx

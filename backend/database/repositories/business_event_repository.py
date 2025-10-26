@@ -51,7 +51,7 @@ async def find_invoice_by_number(
     """Finds a matching, unreconciled invoice."""
     query = """
         SELECT * FROM business_events
-        WHERE event_kind = 'INVOICE_RECEIVED'
+        WHERE event_kind IN ('INVOICE_RECEIVED', 'INVOICE_SENT')
           AND processing_state = $1
           AND currency = $2
           AND metadata->>'invoice_number' = $3
@@ -71,7 +71,7 @@ async def get_unreconciled_mapped_events(
     query = """
         SELECT * FROM business_events
         WHERE processing_state = 'MAPPED'
-          AND event_kind IN ('INVOICE_RECEIVED', 'PAYMENT_SENT')
+          AND event_kind IN ('INVOICE_RECEIVED', 'INVOICE_SENT', 'PAYMENT_SENT')
           AND metadata->>'reconciliation_match_id' IS NULL
         ORDER BY recorded_at ASC
         LIMIT $1

@@ -7,6 +7,7 @@ from enum import Enum
 
 class EventKind(str, Enum):
     INVOICE_RECEIVED = "INVOICE_RECEIVED"
+    INVOICE_SENT = "INVOICE_SENT"
     PAYMENT_SENT = "PAYMENT_SENT"
 
 class ProcessingState(str, Enum):

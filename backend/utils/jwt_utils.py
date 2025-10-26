@@ -100,7 +100,11 @@ def verify_jwt_token(token: str) -> Optional[dict]:
     try:
         payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
         
-        # Verify token type
+        # For Supabase tokens, don't check type field
+        if SUPABASE_JWT_SECRET:
+            return payload
+        
+        # For custom tokens, verify token type
         if payload.get("type") != "wallet_auth":
             return None
             
@@ -138,6 +142,10 @@ def get_wallet_address_from_token(token: str) -> Optional[str]:
     """
     payload = verify_jwt_token(token)
     if payload:
+        # For Supabase tokens, get wallet from user_metadata
+        if SUPABASE_JWT_SECRET and "user_metadata" in payload:
+            return payload["user_metadata"].get("wallet_address")
+        # For custom tokens, get from sub field
         return payload.get("sub")
     return None
 

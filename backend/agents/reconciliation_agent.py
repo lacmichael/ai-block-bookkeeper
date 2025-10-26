@@ -1,196 +1,368 @@
-# Main reconciliation agent file
-# This file will contain startup logic and handlers
-import asyncpg
-import yaml
+"""
+Reconciliation Agent - Automatically matches invoices to payments
+Uses Fetch.ai uAgents framework for agent-to-agent communication.
+
+This agent:
+1. Receives new transaction events from Document Processing Agent
+2. Searches for matching counterpart transactions (invoice ↔ payment)
+3. Uses matcher.py logic to evaluate match quality
+4. Inserts reconciliation records and updates event statuses
+5. Sends response back to requester
+"""
+import logging
 import os
-import httpx
-from uuid import UUID
-from datetime import datetime, timezone
-from uagents import Agent, Context, Model
-from pydantic import Field
+import sys
+from datetime import datetime
 from typing import Dict, Any, Optional
+from dotenv import load_dotenv
+from uagents import Agent, Context, Model
+from uagents.setup import fund_agent_if_low
 
-from domain.models import BusinessEvent, MatchResult
+# Load environment variables
+load_dotenv()
+
+# Add parent directory for imports
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from agents.shared_models import ReconciliationRequest, ReconciliationResponse
 from agents.reconciliation.matcher import evaluate_match
-import database.repositories.business_event_repository as db_repo
+from agents.reconciliation.database_helpers import (
+    find_matching_payment,
+    find_matching_invoice,
+    insert_reconciliation,
+    update_event_reconciliation_status,
+    get_event_by_id
+)
+from config.database import supabase_config
+from domain.models import BusinessEvent, MatchResult
 
-# --- Global DB Pool & Config ---
-db_pool: Optional[asyncpg.Pool] = None
-agent_config: Dict[str, Any] = {}
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# --- Agent Definition ---
-RECON_AGENT_SEED = os.environ.get("RECON_AGENT_SEED", "reconciliation_agent_default_seed")
-agent = Agent(name="ReconciliationAgent", seed=RECON_AGENT_SEED)
+# Get environment configuration
+DOCUMENT_AGENT_ADDRESS = os.getenv("DOCUMENT_AGENT_ADDRESS", "")
 
-def load_config():
-    """Loads agent config from YAML and environment variables."""
-    global agent_config
-    with open("config/agent_config.yaml", 'r') as f:
-        config = yaml.safe_load(f)
+# Create the agent
+agent = Agent(
+    name="ReconciliationAgent",
+    seed="reconciliation-agent-seed-phrase-12345",
+    port=8004,
+    endpoint=["http://127.0.0.1:8004/submit"],
+)
+
+# Fund the agent if needed
+fund_agent_if_low(agent.wallet.address())
+
+
+def reconstruct_business_event(event_dict: Dict[str, Any]) -> BusinessEvent:
+    """
+    Reconstruct a BusinessEvent from a dictionary.
+    Handles both UUID and string event_id formats.
+    """
+    from uuid import UUID
     
-    db_pass = os.environ.get("SUPABASE_DB_PASSWORD")
-    if not db_pass:
-        raise ValueError("SUPABASE_DB_PASSWORD environment variable not set.")
+    # Handle event_id - convert string to UUID if needed
+    event_id = event_dict.get("event_id")
+    if isinstance(event_id, str):
+        try:
+            event_id = UUID(event_id)
+        except ValueError:
+            # If not a valid UUID, keep as string (domain model will validate)
+            pass
     
-    config['database']['password'] = db_pass
-    agent_config = config
+    # Parse datetime strings
+    occurred_at = event_dict.get("occurred_at")
+    if isinstance(occurred_at, str):
+        occurred_at = datetime.fromisoformat(occurred_at.replace('Z', '+00:00'))
+    
+    recorded_at = event_dict.get("recorded_at")
+    if isinstance(recorded_at, str):
+        recorded_at = datetime.fromisoformat(recorded_at.replace('Z', '+00:00'))
+    
+    return BusinessEvent(
+        event_id=event_id,
+        source_system=event_dict.get("source_system", ""),
+        source_id=event_dict.get("source_id", ""),
+        occurred_at=occurred_at,
+        recorded_at=recorded_at,
+        event_kind=event_dict.get("event_kind"),
+        amount_minor=event_dict.get("amount_minor"),
+        currency=event_dict.get("currency", "USD"),
+        processing={"state": "MAPPED"},  # Use MAPPED instead of POSTED_ONCHAIN
+        dedupe_key=event_dict.get("dedupe_key", ""),
+        metadata=event_dict.get("metadata", {})
+    )
 
-# --- Agent Lifecycle Handlers ---
+
+async def process_reconciliation(event_dict: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Main reconciliation logic - finds matching transactions and creates reconciliation records.
+    Returns reconciliation result dict.
+    """
+    try:
+        # Get Supabase client
+        client = supabase_config.get_client(use_service_role=True)
+        
+        # Parse event details
+        event_kind = event_dict.get("event_kind")
+        event_id = event_dict.get("event_id")
+        currency = event_dict.get("currency", "USD")
+        metadata = event_dict.get("metadata", {})
+        
+        logger.info(f"Processing reconciliation for {event_kind} event {event_id}")
+        
+        # Find matching counterpart based on event type
+        counterpart_event = None
+        
+        if event_kind == "INVOICE_RECEIVED":
+            # Find matching payment
+            invoice_number = metadata.get("invoice_number")
+            if not invoice_number:
+                logger.warning(f"Invoice {event_id} has no invoice_number - cannot reconcile")
+                return {
+                    "success": True,
+                    "reconciliation_status": "UNRECONCILED",
+                    "error_message": "No invoice number found in metadata"
+                }
+            
+            counterpart_event = await find_matching_payment(client, invoice_number, currency)
+            
+        elif event_kind == "INVOICE_SENT":
+            # Find matching payment for sent invoice
+            invoice_number = metadata.get("invoice_number")
+            if not invoice_number:
+                logger.warning(f"Invoice {event_id} has no invoice_number - cannot reconcile")
+                return {
+                    "success": True,
+                    "reconciliation_status": "UNRECONCILED",
+                    "error_message": "No invoice number found in metadata"
+                }
+            
+            counterpart_event = await find_matching_payment(client, invoice_number, currency)
+            
+        elif event_kind == "PAYMENT_SENT":
+            # Find matching invoice
+            payment_reference = metadata.get("payment_reference")
+            if not payment_reference:
+                logger.warning(f"Payment {event_id} has no payment_reference - cannot reconcile")
+                return {
+                    "success": True,
+                    "reconciliation_status": "UNRECONCILED",
+                    "error_message": "No payment reference found in metadata"
+                }
+            
+            counterpart_event = await find_matching_invoice(client, payment_reference, currency)
+        
+        else:
+            logger.warning(f"Event {event_id} is type {event_kind} - not supported for reconciliation")
+            return {
+                "success": True,
+                "reconciliation_status": "UNRECONCILED",
+                "error_message": f"Event kind {event_kind} not supported for reconciliation"
+            }
+        
+        # If no counterpart found, log and return
+        if not counterpart_event:
+            logger.info(f"No matching counterpart found for event {event_id} - will retry later")
+            return {
+                "success": True,
+                "reconciliation_status": "UNRECONCILED",
+                "matched_event_id": None
+            }
+        
+        # Reconstruct domain models for matcher
+        event = reconstruct_business_event(event_dict)
+        counterpart = reconstruct_business_event(counterpart_event)
+        
+        # Evaluate match quality using matcher logic
+        match_result: MatchResult = evaluate_match(event, counterpart)
+        
+        logger.info(f"Match result: {match_result.type} with confidence {match_result.confidence}")
+        
+        # Handle based on match type
+        if match_result.type == "PRIMARY_MATCH":
+            # Perfect match - create reconciliation record
+            reconciliation_data = {
+                "invoice_event_id": str(match_result.invoice_id),
+                "payment_event_id": str(match_result.payment_id),
+                "match_type": "PRIMARY_MATCH",
+                "confidence": float(match_result.confidence),
+                "amount_difference": 0,
+                "reconciled_by": "reconciliation-agent",
+                "metadata": {
+                    "reconciliation_timestamp": datetime.utcnow().isoformat(),
+                    "match_confidence": float(match_result.confidence)
+                }
+            }
+            
+            # Insert reconciliation record
+            reconciliation_id = await insert_reconciliation(client, reconciliation_data)
+            
+            # Update both events to POSTED_ONCHAIN status (keep same state, just add reconciliation metadata)
+            await update_event_reconciliation_status(
+                client,
+                str(match_result.invoice_id),
+                "POSTED_ONCHAIN",
+                str(match_result.payment_id),
+                {"reconciliation_id": reconciliation_id, "match_type": "PRIMARY_MATCH"}
+            )
+            
+            await update_event_reconciliation_status(
+                client,
+                str(match_result.payment_id),
+                "POSTED_ONCHAIN",
+                str(match_result.invoice_id),
+                {"reconciliation_id": reconciliation_id, "match_type": "PRIMARY_MATCH"}
+            )
+            
+            logger.info(f"✓ Successfully reconciled {event_id} with {counterpart_event['event_id']}")
+            
+            return {
+                "success": True,
+                "reconciliation_status": "RECONCILED",
+                "matched_event_id": counterpart_event["event_id"],
+                "reconciliation_id": reconciliation_id
+            }
+        
+        elif match_result.type == "PARTIAL_MATCH":
+            # Partial match - create reconciliation but flag for review
+            discrepancy_data = None
+            amount_diff = 0
+            
+            if match_result.discrepancy:
+                discrepancy_data = {
+                    "type": match_result.discrepancy.type,
+                    "invoice_amount": match_result.discrepancy.invoice_amount,
+                    "payment_amount": match_result.discrepancy.payment_amount,
+                    "difference": match_result.discrepancy.difference
+                }
+                amount_diff = abs(match_result.discrepancy.difference)
+            
+            reconciliation_data = {
+                "invoice_event_id": str(match_result.invoice_id),
+                "payment_event_id": str(match_result.payment_id),
+                "match_type": "PARTIAL_MATCH",
+                "confidence": float(match_result.confidence),
+                "amount_difference": amount_diff,
+                "discrepancy": discrepancy_data,
+                "reconciled_by": "reconciliation-agent",
+                "metadata": {
+                    "reconciliation_timestamp": datetime.utcnow().isoformat(),
+                    "match_confidence": float(match_result.confidence),
+                    "requires_review": True
+                }
+            }
+            
+            # Insert reconciliation record
+            reconciliation_id = await insert_reconciliation(client, reconciliation_data)
+            
+            # Update both events to POSTED_ONCHAIN status (keep same state, just add reconciliation metadata)
+            await update_event_reconciliation_status(
+                client,
+                str(match_result.invoice_id),
+                "POSTED_ONCHAIN",
+                str(match_result.payment_id),
+                {
+                    "reconciliation_id": reconciliation_id,
+                    "match_type": "PARTIAL_MATCH",
+                    "discrepancy": discrepancy_data
+                }
+            )
+            
+            await update_event_reconciliation_status(
+                client,
+                str(match_result.payment_id),
+                "POSTED_ONCHAIN",
+                str(match_result.invoice_id),
+                {
+                    "reconciliation_id": reconciliation_id,
+                    "match_type": "PARTIAL_MATCH",
+                    "discrepancy": discrepancy_data
+                }
+            )
+            
+            logger.info(f"⚠ Partial match for {event_id} - flagged for review")
+            
+            return {
+                "success": True,
+                "reconciliation_status": "PARTIAL",
+                "matched_event_id": counterpart_event["event_id"],
+                "discrepancy": discrepancy_data,
+                "reconciliation_id": reconciliation_id
+            }
+        
+        else:  # NO_MATCH
+            logger.info(f"No valid match found for event {event_id}")
+            return {
+                "success": True,
+                "reconciliation_status": "UNRECONCILED",
+                "matched_event_id": None
+            }
+    
+    except Exception as e:
+        logger.error(f"Error during reconciliation: {str(e)}")
+        return {
+            "success": False,
+            "reconciliation_status": "UNRECONCILED",
+            "error_message": str(e)
+        }
+
+
+@agent.on_message(ReconciliationRequest)
+async def handle_reconciliation_request(ctx: Context, sender: str, msg: ReconciliationRequest):
+    """
+    Main handler for reconciliation requests.
+    Receives new transaction events and attempts to match them with counterparts.
+    """
+    logger.info(f"Received reconciliation request for event {msg.event_id} from {sender}")
+    
+    try:
+        # Process reconciliation
+        result = await process_reconciliation(msg.business_event)
+        
+        # Send response back to sender
+        response = ReconciliationResponse(
+            event_id=msg.event_id,
+            success=result["success"],
+            reconciliation_status=result["reconciliation_status"],
+            matched_event_id=result.get("matched_event_id"),
+            discrepancy=result.get("discrepancy"),
+            error_message=result.get("error_message")
+        )
+        
+        await ctx.send(sender, response)
+        logger.info(f"Sent reconciliation response for {msg.event_id}: {result['reconciliation_status']}")
+        
+    except Exception as e:
+        error_msg = f"Error handling reconciliation request for {msg.event_id}: {str(e)}"
+        logger.error(error_msg)
+        
+        # Send error response
+        response = ReconciliationResponse(
+            event_id=msg.event_id,
+            success=False,
+            reconciliation_status="UNRECONCILED",
+            error_message=error_msg
+        )
+        
+        await ctx.send(sender, response)
+
 
 @agent.on_event("startup")
 async def startup(ctx: Context):
-    """Initializes the Supabase DB pool when the agent starts."""
-    global db_pool
-    
-    load_config()
-    ctx.storage.set("config", agent_config)
-    
-    ctx.logger.info("Connecting to SupABASE (PostgreSQL)...")
-    db_config = agent_config['database']
-    
-    SUPABASE_CONN_STRING = (
-        f"postgresql://{db_config['user']}:{db_config['password']}"
-        f"@{db_config['host']}:{db_config['port']}/{db_config['name']}"
-    )
+    """Agent startup handler"""
+    logger.info("Reconciliation Agent started")
+    logger.info(f"Agent address: {agent.address}")
+    logger.info("Ready to process reconciliation requests")
 
-    try:
-        db_pool = await asyncpg.create_pool(
-            SUPABASE_CONN_STRING, min_size=5, max_size=20
-        )
-        ctx.storage.set("db_pool", db_pool)
-        ctx.logger.info("Database pool connected. Agent is online.")
-    except Exception as e:
-        ctx.logger.error(f"Failed to connect to Supabase DB: {e}")
-        raise e
 
 @agent.on_event("shutdown")
 async def shutdown(ctx: Context):
-    """Closes the DB pool when the agent stops."""
-    global db_pool
-    if db_pool:
-        ctx.logger.info("Closing database pool...")
-        await db_pool.close()
-        ctx.logger.info("Database pool closed. Agent is offline.")
+    """Agent shutdown handler"""
+    logger.info("Reconciliation Agent shutting down")
 
-# --- Agent Message Models ---
 
-class ReconciliationRequest(Model):
-    event_id: UUID
-
-# --- Agent Handlers ---
-
-@agent.on_message(model=ReconciliationRequest)
-async def on_reconciliation_request(ctx: Context, sender: str, msg: ReconciliationRequest):
-    """
-    Event-driven handler triggered by the FastAPI endpoint.
-    """
-    ctx.logger.info(f"Event-driven request received for event: {msg.event_id}")
-    db_pool = ctx.storage.get("db_pool")
-    
-    async with db_pool.acquire() as db:
-        try:
-            # Use a transaction for the check + update
-            async with db.transaction():
-                # We use a lock to prevent the polling agent from grabbing this
-                await db.execute("SELECT 1 FROM business_events WHERE event_id = $1 FOR UPDATE NOWAIT", msg.event_id)
-                await handle_reconciliation_logic(ctx, db, msg.event_id)
-        except asyncpg.exceptions.LockNotAvailableError:
-            ctx.logger.warning(f"Event {msg.event_id} is already being processed (likely by polling). Skipping.")
-        except Exception as e:
-            ctx.logger.error(f"Error in on_message handler for {msg.event_id}: {e}")
-
-@agent.on_interval(period=agent_config.get('reconciliation', {}).get('polling_interval_seconds', 60))
-async def polling_safety_net(ctx: Context):
-    """
-    Polling fallback to catch any events missed by the HTTP trigger.
-    """
-    ctx.logger.info("Polling for missed events...")
-    db_pool = ctx.storage.get("db_pool")
-    
-    events_processed = 0
-    try:
-        async with db_pool.acquire() as db:
-            # Start ONE transaction for the entire batch
-            async with db.transaction():
-                # This query uses FOR UPDATE NOWAIT to lock the rows
-                events_to_process = await db_repo.get_unreconciled_mapped_events(db, limit=50)
-                
-                if not events_to_process:
-                    ctx.logger.info("Polling: No new events found.")
-                    return
-
-                for event in events_to_process:
-                    await handle_reconciliation_logic(ctx, db, event.event_id)
-                    events_processed += 1
-                    
-        if events_processed > 0:
-            ctx.logger.info(f"Polling: Processed {events_processed} missed events.")
-            
-    except asyncpg.exceptions.LockNotAvailableError:
-        ctx.logger.warning("Polling: Could not acquire lock (race condition with event-handler). Will retry next cycle.")
-    except Exception as e:
-        ctx.logger.error(f"Error in polling handler: {e}")
-
-# --- Core Logic ---
-
-async def handle_reconciliation_logic(
-    ctx: Context, db: asyncpg.Connection, event_id: UUID
-):
-    """
-    The main reconciliation logic, shared by both handlers.
-    Assumes it is already inside a database transaction.
-    """
-    # 1. Fetch the event
-    event = await db_repo.get_business_event_by_id(db, event_id)
-    
-    # 2. Validate eligibility
-    if not event or event.processing.state != 'MAPPED' or event.metadata.get('reconciliation_match_id'):
-        return # Already processed or not ready
-
-    # 3. Find potential counterpart
-    counterpart = None
-    if event.event_kind == 'INVOICE_RECEIVED':
-        counterpart = await db_repo.find_payment_by_reference(
-            db,
-            payment_reference=event.metadata.get('invoice_number', ''),
-            processing_state='MAPPED',
-            currency=event.currency
-        )
-    elif event.event_kind == 'PAYMENT_SENT':
-        counterpart = await db_repo.find_invoice_by_number(
-            db,
-            invoice_number=event.metadata.get('payment_reference', ''),
-            processing_state='MAPPED',
-            currency=event.currency
-        )
-
-    # 4. Apply Matching Rules
-    match_result = evaluate_match(event, counterpart)
-
-    # 5. Act on MatchResult and create audit logs
-    if match_result.type == 'PRIMARY_MATCH':
-        ctx.logger.info(f"PRIMARY_MATCH found for event {event_id}")
-        await db_repo.update_both_to_reconciled(
-            db, event.event_id, counterpart.event_id, match_result.model_dump()
-        )
-        await db_repo.create_audit_log(
-            db, "RECONCILE_SUCCESS", event.event_id, [], match_result.model_dump()
-        )
-    
-    elif match_result.type == 'PARTIAL_MATCH':
-        ctx.logger.warn(f"PARTIAL_MATCH found for event {event_id}. Flagging.")
-        await db_repo.flag_both_for_review(
-            db, event.event_id, counterpart.event_id, match_result.model_dump()
-        )
-        await db_repo.create_audit_log(
-            db, "RECONCILE_FAIL_PARTIAL", event.event_id, [], match_result.model_dump()
-        )
-        
-    else: # NO_MATCH
-        ctx.logger.info(f"NO_MATCH found for event {event_id}. Updating timestamp.")
-        await db_repo.update_reconciliation_attempt(
-            db, event.event_id, datetime.now(timezone.utc).isoformat()
-        )
-        
 if __name__ == "__main__":
     agent.run()
+
