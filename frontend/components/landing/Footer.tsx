@@ -54,12 +54,10 @@ export default function Footer() {
           <Link href="/" className="flex items-center gap-2 mb-4">
             <div className="w-8 h-8 gradient-primary rounded-lg flex items-center justify-center">
               <span className="text-primary-foreground font-bold text-lg">
-                A
+                b
               </span>
             </div>
-            <span className="text-2xl font-bold text-foreground">
-              AscendTech
-            </span>
+            <span className="text-2xl font-bold text-foreground">booki</span>
           </Link>
           <p className="text-muted-foreground mb-6 max-w-md">
             Revolutionizing financial operations with autonomous blockchain
@@ -150,7 +148,7 @@ export default function Footer() {
 
       {/* Bottom Section */}
       <div className="mt-16 text-center text-sm text-muted-foreground">
-        &copy; {new Date().getFullYear()} AscendTech. All rights reserved.
+        &copy; {new Date().getFullYear()} booki. All rights reserved.
       </div>
     </footer>
   );

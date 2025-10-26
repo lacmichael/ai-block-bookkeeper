@@ -50,9 +50,9 @@ export function Sidebar({ user }: SidebarProps) {
       <div className="border-b">
         <div className="flex h-12 items-center justify-center px-4">
           {isCollapsed ? (
-            <h2 className="text-lg font-semibold">AB</h2>
+            <h2 className="text-lg font-semibold">B</h2>
           ) : (
-            <h2 className="text-lg font-semibold">AI Block Bookkeeper</h2>
+            <h2 className="text-lg font-semibold">booki</h2>
           )}
         </div>
         <div className="flex justify-center pb-2">

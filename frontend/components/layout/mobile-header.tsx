@@ -14,7 +14,7 @@ export function MobileHeader({
 }: MobileHeaderProps) {
   return (
     <div className="md:hidden flex items-center justify-between h-16 px-4 border-b bg-background">
-      <h1 className="text-lg font-semibold">AI Block Bookkeeper</h1>
+      <h1 className="text-lg font-semibold">booki</h1>
       <Button
         variant="ghost"
         size="sm"

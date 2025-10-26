@@ -31,8 +31,8 @@ export default function CtaSection() {
           </h2>
 
           <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-            Join the future of accounting with AscendTech. Get early access to
-            our revolutionary blockchain-powered platform.
+            Join the future of accounting with booki. Get early access to our
+            revolutionary blockchain-powered platform.
           </p>
 
           {/* Email Capture Form */}
