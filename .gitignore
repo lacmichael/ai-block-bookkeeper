@@ -94,7 +94,8 @@ pdm.lock
 .pdm.toml
 
 # Move (Sui blockchain)
-Move.lock
+sui_env/Move.lock
+sui_env/.sui-config
 
 # PEP 582
 __pypackages__/

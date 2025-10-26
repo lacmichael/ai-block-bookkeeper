@@ -78,15 +78,13 @@ async def start_agents_in_background():
     # instead of calling the main() function which creates its own agent
     from agents.audit_verification_agent import (
         load_config_from_env,
-        BusinessEventMessage,
-        AuditResponse,
         Agent as UAAgent,
         Context,
         process_and_post_event,
         BusinessEvent,
         DocumentMetadata
     )
-    from datetime import datetime
+    from agents.shared_models import BusinessEventMessage, AuditResponse
     
     config = load_config_from_env()
     

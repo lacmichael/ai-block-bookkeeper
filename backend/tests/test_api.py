@@ -143,7 +143,7 @@ def main():
     results.append(("Agent Info", test_agent_info()))
     
     # Test document processing if example file exists
-    example_file = Path(__file__).parent / "example" / "example_invoice_01.pdf"
+    example_file = Path(__file__).parent.parent / "example" / "example_invoice_01.pdf"
     if example_file.exists():
         results.append(("Document Processing", test_process_document(str(example_file))))
     else:
