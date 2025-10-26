@@ -284,8 +284,11 @@ export function SuiLedgerVisualization({
               </div>
               <div className="text-right">
                 <div className="text-sm font-medium">
-                  -{suiTransaction.amount.toLocaleString()}{" "}
-                  {suiTransaction.currency}
+                  -
+                  {new Intl.NumberFormat("en-US", {
+                    style: "currency",
+                    currency: "USD",
+                  }).format(suiTransaction.amount / 100)}
                 </div>
                 <div className="text-xs text-red-500">Debit</div>
               </div>
@@ -306,8 +309,11 @@ export function SuiLedgerVisualization({
               </div>
               <div className="text-right">
                 <div className="text-sm font-medium">
-                  +{suiTransaction.amount.toLocaleString()}{" "}
-                  {suiTransaction.currency}
+                  +
+                  {new Intl.NumberFormat("en-US", {
+                    style: "currency",
+                    currency: "USD",
+                  }).format(suiTransaction.amount / 100)}
                 </div>
                 <div className="text-xs text-green-500">Credit</div>
               </div>

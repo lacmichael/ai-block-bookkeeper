@@ -2,6 +2,7 @@
 
 import { createClient } from "@/utils/supabase/server";
 import { mockBusinessEvents } from "@/utils/mockData";
+import { getAuditMetadata, AuditMetadata } from "@/utils/mockAuditData";
 
 export interface Party {
   party_id: string;
@@ -242,7 +243,7 @@ export async function getBusinessEvents(): Promise<BusinessEvent[]> {
 
 export async function getBusinessEventById(
   eventId: string
-): Promise<BusinessEvent | null> {
+): Promise<(BusinessEvent & { audit_metadata: AuditMetadata }) | null> {
   const supabase = await createClient();
 
   try {
@@ -276,13 +277,27 @@ export async function getBusinessEventById(
       console.error("Error fetching business event:", error);
       // Fall back to mock data
       const mockEvents = getMockBusinessEvents();
-      return mockEvents.find((event) => event.event_id === eventId) || null;
+      const mockEvent = mockEvents.find((event) => event.event_id === eventId);
+      if (mockEvent) {
+        return {
+          ...mockEvent,
+          audit_metadata: getAuditMetadata(eventId),
+        };
+      }
+      return null;
     }
 
     if (!data) {
       // Fall back to mock data
       const mockEvents = getMockBusinessEvents();
-      return mockEvents.find((event) => event.event_id === eventId) || null;
+      const mockEvent = mockEvents.find((event) => event.event_id === eventId);
+      if (mockEvent) {
+        return {
+          ...mockEvent,
+          audit_metadata: getAuditMetadata(eventId),
+        };
+      }
+      return null;
     }
 
     // Fetch payer and payee party details if IDs exist
@@ -319,11 +334,24 @@ export async function getBusinessEventById(
       reconciliation_state: "UNRECONCILED", // Default value since not in schema
     };
 
-    return transformedData;
+    // Add audit metadata
+    const businessEventWithAudit = {
+      ...transformedData,
+      audit_metadata: getAuditMetadata(data.event_id),
+    };
+
+    return businessEventWithAudit;
   } catch (error) {
     console.error("Error in getBusinessEventById:", error);
     // Fall back to mock data
     const mockEvents = getMockBusinessEvents();
-    return mockEvents.find((event) => event.event_id === eventId) || null;
+    const mockEvent = mockEvents.find((event) => event.event_id === eventId);
+    if (mockEvent) {
+      return {
+        ...mockEvent,
+        audit_metadata: getAuditMetadata(eventId),
+      };
+    }
+    return null;
   }
 }

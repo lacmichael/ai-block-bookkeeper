@@ -1,9 +1,4 @@
-import {
-  LayoutDashboard,
-  FileText,
-  Receipt,
-  Shield,
-} from "lucide-react";
+import { LayoutDashboard, FileText, Receipt, Shield } from "lucide-react";
 
 export interface NavigationItem {
   title: string;
@@ -32,10 +27,10 @@ export const navigationItems: NavigationItem[] = [
     description: "View all transactions",
   },
   {
-    title: "Reconciliation",
-    href: "/reconciliation",
+    title: "Audit",
+    href: "/audit",
     icon: Shield,
-    description: "Audit reconciliation",
+    description: "Audit and compliance",
   },
 ];
 

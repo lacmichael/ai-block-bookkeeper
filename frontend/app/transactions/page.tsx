@@ -23,6 +23,7 @@ import {
   Building,
   CreditCard,
   RefreshCw,
+  Shield,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -535,16 +536,30 @@ export default function TransactionsPage() {
                         </div>
                       </div>
 
-                      <Link href={`/transactions/${transaction.event_id}`}>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex items-center gap-2"
+                      <div className="flex gap-2">
+                        <Link href={`/transactions/${transaction.event_id}`}>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex items-center gap-2"
+                          >
+                            <Eye className="h-4 w-4" />
+                            View Details
+                          </Button>
+                        </Link>
+                        <Link
+                          href={`/audit/transaction/${transaction.event_id}`}
                         >
-                          <Eye className="h-4 w-4" />
-                          View Details
-                        </Button>
-                      </Link>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex items-center gap-2"
+                          >
+                            <Shield className="h-4 w-4" />
+                            Audit
+                          </Button>
+                        </Link>
+                      </div>
                     </div>
                   </div>
                 </CardContent>
