@@ -13,9 +13,42 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AI Block Bookkeeper",
+  title: "AscendTech - Autonomous Blockchain Accounting Service",
   description:
-    "AI-powered financial audit and bookkeeping platform with blockchain integration",
+    "Transform your financial operations with AscendTech's autonomous blockchain accounting service. Powered by Fetch.ai agents and Sui blockchain for immutable, cryptographically verifiable ledger technology.",
+  keywords: [
+    "blockchain accounting",
+    "autonomous agents",
+    "Fetch.ai",
+    "Sui blockchain",
+    "financial audit",
+    "cryptographic verification",
+    "AI-powered accounting",
+    "immutable ledger",
+  ],
+  authors: [{ name: "AscendTech" }],
+  creator: "AscendTech",
+  publisher: "AscendTech",
+  robots: {
+    index: true,
+    follow: true,
+  },
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: "https://ascendtech.com",
+    title: "AscendTech - Autonomous Blockchain Accounting Service",
+    description:
+      "Transform your financial operations with autonomous blockchain accounting powered by Fetch.ai agents and Sui blockchain.",
+    siteName: "AscendTech",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "AscendTech - Autonomous Blockchain Accounting Service",
+    description:
+      "Transform your financial operations with autonomous blockchain accounting powered by Fetch.ai agents and Sui blockchain.",
+    creator: "@ascendtech",
+  },
 };
 
 export default function RootLayout({
