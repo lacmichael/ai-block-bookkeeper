@@ -116,147 +116,149 @@ export function TransactionsTable({ businessEvents }: TransactionsTableProps) {
         <CardTitle>Recent Transactions</CardTitle>
       </CardHeader>
       <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleSort("occurred_at")}
-                  className="h-auto p-0 font-medium"
-                >
-                  Date {getSortIcon("occurred_at")}
-                </Button>
-              </TableHead>
-              <TableHead>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleSort("description")}
-                  className="h-auto p-0 font-medium"
-                >
-                  Description {getSortIcon("description")}
-                </Button>
-              </TableHead>
-              <TableHead>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleSort("event_kind")}
-                  className="h-auto p-0 font-medium"
-                >
-                  Type {getSortIcon("event_kind")}
-                </Button>
-              </TableHead>
-              <TableHead>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleSort("amount_minor")}
-                  className="h-auto p-0 font-medium"
-                >
-                  Amount {getSortIcon("amount_minor")}
-                </Button>
-              </TableHead>
-              <TableHead>Payer</TableHead>
-              <TableHead>Payee</TableHead>
-              <TableHead>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleSort("source_system")}
-                  className="h-auto p-0 font-medium"
-                >
-                  Source {getSortIcon("source_system")}
-                </Button>
-              </TableHead>
-              <TableHead>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleSort("reconciliation_state")}
-                  className="h-auto p-0 font-medium"
-                >
-                  Status {getSortIcon("reconciliation_state")}
-                </Button>
-              </TableHead>
-              <TableHead>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {sortedTransactions.map((transaction) => (
-              <TableRow key={transaction.event_id}>
-                <TableCell className="font-medium">
-                  {formatDate(transaction.occurred_at)}
-                </TableCell>
-                <TableCell className="max-w-[200px] truncate">
-                  <div>
-                    <div className="truncate">{transaction.description}</div>
-                    <div className="text-xs text-muted-foreground">
-                      Ref: {transaction.source_id}
-                    </div>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  {getEventKindBadge(transaction.event_kind)}
-                </TableCell>
-                <TableCell
-                  className={`font-medium ${
-                    transaction.amount_minor >= 0
-                      ? "text-green-600"
-                      : "text-red-600"
-                  }`}
-                >
-                  {formatCurrency(transaction.amount_minor)}
-                </TableCell>
-                <TableCell>
-                  <PartyInfo
-                    party={transaction.payer_party || null}
-                    role={transaction.payer_role || undefined}
+        <div className="max-h-[600px] overflow-y-auto">
+          <Table>
+            <TableHeader className="sticky top-0 bg-background z-10">
+              <TableRow>
+                <TableHead>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleSort("occurred_at")}
+                    className="h-auto p-0 font-medium"
                   >
-                    <div className="text-sm">
-                      {transaction.payer_party?.display_name || "-"}
-                    </div>
-                    {transaction.payer_role && (
-                      <div className="text-xs text-muted-foreground">
-                        {transaction.payer_role}
-                      </div>
-                    )}
-                  </PartyInfo>
-                </TableCell>
-                <TableCell>
-                  <PartyInfo
-                    party={transaction.payee_party || null}
-                    role={transaction.payee_role || undefined}
+                    Date {getSortIcon("occurred_at")}
+                  </Button>
+                </TableHead>
+                <TableHead>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleSort("description")}
+                    className="h-auto p-0 font-medium"
                   >
-                    <div className="text-sm">
-                      {transaction.payee_party?.display_name || "-"}
-                    </div>
-                    {transaction.payee_role && (
-                      <div className="text-xs text-muted-foreground">
-                        {transaction.payee_role}
-                      </div>
-                    )}
-                  </PartyInfo>
-                </TableCell>
-                <TableCell>
-                  <Badge variant="outline">{transaction.source_system}</Badge>
-                </TableCell>
-                <TableCell>
-                  {getStatusBadge(transaction.reconciliation_state)}
-                </TableCell>
-                <TableCell>
-                  <Link href={`/transactions/${transaction.event_id}`}>
-                    <Button variant="outline" size="sm">
-                      View
-                    </Button>
-                  </Link>
-                </TableCell>
+                    Description {getSortIcon("description")}
+                  </Button>
+                </TableHead>
+                <TableHead>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleSort("event_kind")}
+                    className="h-auto p-0 font-medium"
+                  >
+                    Type {getSortIcon("event_kind")}
+                  </Button>
+                </TableHead>
+                <TableHead>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleSort("amount_minor")}
+                    className="h-auto p-0 font-medium"
+                  >
+                    Amount {getSortIcon("amount_minor")}
+                  </Button>
+                </TableHead>
+                <TableHead>Payer</TableHead>
+                <TableHead>Payee</TableHead>
+                <TableHead>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleSort("source_system")}
+                    className="h-auto p-0 font-medium"
+                  >
+                    Source {getSortIcon("source_system")}
+                  </Button>
+                </TableHead>
+                <TableHead>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleSort("reconciliation_state")}
+                    className="h-auto p-0 font-medium"
+                  >
+                    Status {getSortIcon("reconciliation_state")}
+                  </Button>
+                </TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {sortedTransactions.map((transaction) => (
+                <TableRow key={transaction.event_id}>
+                  <TableCell className="font-medium">
+                    {formatDate(transaction.occurred_at)}
+                  </TableCell>
+                  <TableCell className="max-w-[200px] truncate">
+                    <div>
+                      <div className="truncate">{transaction.description}</div>
+                      <div className="text-xs text-muted-foreground">
+                        Ref: {transaction.source_id}
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    {getEventKindBadge(transaction.event_kind)}
+                  </TableCell>
+                  <TableCell
+                    className={`font-medium ${
+                      transaction.amount_minor >= 0
+                        ? "text-green-600"
+                        : "text-red-600"
+                    }`}
+                  >
+                    {formatCurrency(transaction.amount_minor)}
+                  </TableCell>
+                  <TableCell>
+                    <PartyInfo
+                      party={transaction.payer_party || null}
+                      role={transaction.payer_role || undefined}
+                    >
+                      <div className="text-sm">
+                        {transaction.payer_party?.display_name || "-"}
+                      </div>
+                      {transaction.payer_role && (
+                        <div className="text-xs text-muted-foreground">
+                          {transaction.payer_role}
+                        </div>
+                      )}
+                    </PartyInfo>
+                  </TableCell>
+                  <TableCell>
+                    <PartyInfo
+                      party={transaction.payee_party || null}
+                      role={transaction.payee_role || undefined}
+                    >
+                      <div className="text-sm">
+                        {transaction.payee_party?.display_name || "-"}
+                      </div>
+                      {transaction.payee_role && (
+                        <div className="text-xs text-muted-foreground">
+                          {transaction.payee_role}
+                        </div>
+                      )}
+                    </PartyInfo>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline">{transaction.source_system}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    {getStatusBadge(transaction.reconciliation_state)}
+                  </TableCell>
+                  <TableCell>
+                    <Link href={`/transactions/${transaction.event_id}`}>
+                      <Button variant="outline" size="sm">
+                        View
+                      </Button>
+                    </Link>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       </CardContent>
     </Card>
   );

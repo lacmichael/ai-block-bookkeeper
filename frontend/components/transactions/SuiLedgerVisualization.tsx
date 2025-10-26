@@ -178,9 +178,6 @@ export function SuiLedgerVisualization({
             <Shield className="h-5 w-5" />
             Sui Blockchain Record
           </CardTitle>
-          <p className="text-xs text-muted-foreground mt-1">
-            * This is a simulated blockchain record for demonstration purposes
-          </p>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
